@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debug API</title>
+</head>
+<body>
+  <h1>API Test</h1>
+  <button onclick="testFirms()">Test /api/firms</button>
+  <button onclick="testCampaigns()">Test /api/campaigns</button>
+  <pre id="result"></pre>
+  <script>
+    async function testFirms(){
+      const res = await fetch('/api/firms')
+      const data = await res.json()
+      document.getElementById('result').textContent = JSON.stringify(data, null, 2)
+    }
+    async function testCampaigns(){
+      const res = await fetch('/api/campaigns')
+      const data = await res.json()
+      document.getElementById('result').textContent = JSON.stringify(data, null, 2)
+    }
+  </script>
+</body>
+</html>

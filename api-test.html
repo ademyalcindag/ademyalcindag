@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Backend API Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { text-align: center; color: #333; margin-bottom: 30px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .card h3 { color: #667eea; margin-bottom: 15px; }
+    button { background: #667eea; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; margin-bottom: 8px; }
+    button:hover { background: #764ba2; }
+    .output { background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 10px; margin-top: 10px; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; }
+    .success { color: #28a745; }
+    .error { color: #dc3545; }
+    .info { background: #e7f3ff; border-left: 4px solid #2196F3; padding: 12px; margin: 10px 0; border-radius: 4px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚚 Backend API Test Panel</h1>
+    
+    <div class="info">
+      ✅ Server: <strong>http://localhost:4000</strong><br>
+      Test Edilecek: Şirketler, Login, Fiyatlar, Kampanyalar, Mesajlar, Rezervasyonlar
+    </div>
+
+    <div class="grid">
+      <!-- Public APIs -->
+      <div class="card">
+        <h3>📍 Şirketler</h3>
+        <button onclick="testAPI('GET', '/api/firms', null, 'firms')">Tüm Şirketleri Listele</button>
+        <button onclick="testAPI('GET', '/api/firms/1', null, 'firm')">Firma #1 Detay</button>
+        <div class="output" id="firms"></div>
+      </div>
+
+      <div class="card">
+        <h3>💰 Fiyatlar</h3>
+        <button onclick="testAPI('GET', '/api/firms/1/prices', null, 'prices')">Fiyatları Getir</button>
+        <button onclick="testAPI('POST', '/api/search-prices', {fromCity: 'İstanbul', toCity: 'Ankara'}, 'search')">Fiyat Ara (İst→Ank)</button>
+        <div class="output" id="prices"></div>
+      </div>
+
+      <div class="card">
+        <h3>📢 Kampanyalar</h3>
+        <button onclick="testAPI('GET', '/api/campaigns', null, 'campaigns')">Kampanyaları Listele</button>
+        <div class="output" id="campaigns"></div>
+      </div>
+
+      <!-- Authentication -->
+      <div class="card">
+        <h3>🔐 Login</h3>
+        <button onclick="testLogin()">Şirket Girişi</button>
+        <button onclick="testLoginUser()">Kullanıcı Girişi</button>
+        <button onclick="testRegisterUser()">Yeni Kullanıcı</button>
+        <div class="output" id="auth"></div>
+      </div>
+
+      <!-- Messages & Bookings -->
+      <div class="card">
+        <h3>💬 Mesajlar</h3>
+        <button onclick="testAPI('GET', '/api/messages/1', null, 'messages')">Mesajları Getir</button>
+        <button onclick="sendMessage()">Mesaj Gönder</button>
+        <div class="output" id="messages"></div>
+      </div>
+
+      <div class="card">
+        <h3>📅 Rezervasyonlar</h3>
+        <button onclick="createBooking()">Rezervasyon Oluştur</button>
+        <button onclick="addReview()">Yorum Ekle</button>
+        <div class="output" id="bookings"></div>
+      </div>
+
+      <!-- Protected Endpoints -->
+      <div class="card">
+        <h3>🔒 Korumalı İşlemler</h3>
+        <button onclick="testStats()">İstatistikleri Getir</button>
+        <button onclick="addPrice()">Fiyat Ekle</button>
+        <button onclick="addCampaign()">Kampanya Ekle</button>
+        <div class="output" id="protected"></div>
+      </div>
+
+      <!-- Server Status -->
+      <div class="card">
+        <h3>📊 Server Durumu</h3>
+        <button onclick="checkStatus()">Durumu Kontrol Et</button>
+        <div class="output" id="status"></div>
+      </div>
+
+      <!-- Test Credentials -->
+      <div class="card">
+        <h3>🔑 Test Bilgileri</h3>
+        <div class="info" style="margin: 0;">
+          <strong>Şirket:</strong><br>
+          metro@tasima.com / password123<br>
+          Vergi: 1234567890<br><br>
+          <strong>Kullanıcı:</strong><br>
+          user@example.com / user123
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:4000/api';
+    let token = null;
+
+    function showResult(elementId, data, isError = false) {
+      const elem = document.getElementById(elementId);
+      elem.innerHTML = `<span class="${isError ? 'error' : 'success'}">${isError ? '❌ ' : '✅ '}${new Date().toLocaleTimeString('tr-TR')}</span><pre>${JSON.stringify(data, null, 2).substring(0, 500)}</pre>`;
+    }
+
+    async function testAPI(method, path, body, elementId) {
+      try {
+        const options = { method };
+        if (body) {
+          options.headers = { 'Content-Type': 'application/json' };
+          options.body = JSON.stringify(body);
+        }
+        const res = await fetch(API + path, options);
+        const data = await res.json();
+        showResult(elementId, res.ok ? data : { error: data, status: res.status }, !res.ok);
+      } catch (e) {
+        showResult(elementId, { error: e.message }, true);
+      }
+    }
+
+    async function testLogin() {
+      try {
+        const res = await fetch(`${API}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: 'metro@tasima.com',
+            password: 'password123'
+          })
+        });
+        const data = await res.json();
+        if (data.token) {
+          token = data.token;
+          showResult('auth', { ...data, token: data.token.substring(0, 50) + '...' });
+        } else {
+          showResult('auth', data, true);
+        }
+      } catch (e) {
+        showResult('auth', { error: e.message }, true);
+      }
+    }
+
+    async function testLoginUser() {
+      try {
+        const res = await fetch(`${API}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: 'user@example.com',
+            password: 'user123'
+          })
+        });
+        const data = await res.json();
+        if (data.token) {
+          token = data.token;
+          showResult('auth', { ...data, token: data.token.substring(0, 50) + '...' });
+        } else {
+          showResult('auth', data, true);
+        }
+      } catch (e) {
+        showResult('auth', { error: e.message }, true);
+      }
+    }
+
+    async function testRegisterUser() {
+      try {
+        const res = await fetch(`${API}/register-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: 'Test User',
+            email: `test${Date.now()}@example.com`,
+            phone: '+90 500 111 2222',
+            password: 'test123'
+          })
+        });
+        const data = await res.json();
+        showResult('auth', data, !data.ok);
+      } catch (e) {
+        showResult('auth', { error: e.message }, true);
+      }
+    }
+
+    async function testStats() {
+      if (!token) {
+        showResult('protected', { error: 'Önce Login yap (Şirket Girişi)' }, true);
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/firms/1/stats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        showResult('protected', data, !res.ok);
+      } catch (e) {
+        showResult('protected', { error: e.message }, true);
+      }
+    }
+
+    async function addPrice() {
+      if (!token) {
+        showResult('protected', { error: 'Önce Login yap' }, true);
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/firms/1/prices`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            fromCity: 'İstanbul',
+            toCity: 'Bursa',
+            price: 1200,
+            estimatedHours: 3
+          })
+        });
+        const data = await res.json();
+        showResult('protected', data, !res.ok);
+      } catch (e) {
+        showResult('protected', { error: e.message }, true);
+      }
+    }
+
+    async function addCampaign() {
+      if (!token) {
+        showResult('protected', { error: 'Önce Login yap' }, true);
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/firms/1/campaigns`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            title: 'Yeni Kampanya',
+            description: '%25 indirim',
+            discount: 25,
+            startDate: '2025-01-01',
+            endDate: '2025-01-31'
+          })
+        });
+        const data = await res.json();
+        showResult('protected', data, !res.ok);
+      } catch (e) {
+        showResult('protected', { error: e.message }, true);
+      }
+    }
+
+    async function sendMessage() {
+      try {
+        const res = await fetch(`${API}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromUser: 'user123',
+            toFirm: 1,
+            content: 'Merhaba! Fiyat hakkında bilgi almak istiyorum.'
+          })
+        });
+        const data = await res.json();
+        showResult('messages', data, !res.ok);
+      } catch (e) {
+        showResult('messages', { error: e.message }, true);
+      }
+    }
+
+    async function createBooking() {
+      try {
+        const res = await fetch(`${API}/bookings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firmId: 1,
+            userId: 'user123',
+            fromCity: 'İstanbul',
+            toCity: 'Ankara',
+            moveDate: '2025-12-25',
+            items: '3 oda eşyası',
+            specialRequests: 'Asansör var',
+            totalPrice: 2500
+          })
+        });
+        const data = await res.json();
+        showResult('bookings', data, !res.ok);
+      } catch (e) {
+        showResult('bookings', { error: e.message }, true);
+      }
+    }
+
+    async function addReview() {
+      try {
+        const res = await fetch(`${API}/reviews`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firmId: 1,
+            userId: 'user123',
+            rating: 5,
+            comment: 'Harika hizmet!'
+          })
+        });
+        const data = await res.json();
+        showResult('bookings', data, !res.ok);
+      } catch (e) {
+        showResult('bookings', { error: e.message }, true);
+      }
+    }
+
+    async function checkStatus() {
+      try {
+        const res = await fetch(`${API}/firms`);
+        const data = await res.json();
+        showResult('status', {
+          status: 'Online ✅',
+          firms: data.length,
+          timestamp: new Date().toLocaleString('tr-TR')
+        });
+      } catch (e) {
+        showResult('status', { status: 'Offline ❌', error: e.message }, true);
+      }
+    }
+
+    checkStatus();
+  </script>
+</body>
+</html>

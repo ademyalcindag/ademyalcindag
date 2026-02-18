@@ -1,3 +1,11 @@
+/**
+ * Taşımacılık Rehberi - Production Backend
+ * JWT Authentication + SQLite Database
+ * Kurulum: npm install (tüm dependencies zaten var)
+ * Çalıştırma: node server/index.js
+ * Port: 3001 (eski: 4000)
+ */
+
 import express from 'express'
 import cors from 'cors'
 import multer from 'multer'
@@ -5,194 +13,775 @@ import path from 'path'
 import fs from 'fs'
 import sqlite3 from 'sqlite3'
 import { open } from 'sqlite'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+
+dotenv.config()
 
 const __dirname = path.resolve()
 const uploadDir = path.join(__dirname, 'uploads')
+const distDir = path.join(__dirname, 'dist')
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'server.db')
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir)
 
 const upload = multer({ dest: uploadDir })
-
 const app = express()
-app.use(cors())
+
+// Middleware
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
+if (allowedOrigins.length === 0) {
+  app.use(cors())
+} else {
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+        return
+      }
+
+      callback(new Error('Not allowed by CORS'))
+    },
+  }))
+}
+
 app.use(express.json())
 app.use('/uploads', express.static(uploadDir))
 
-let db
-async function initDb(){
-  db = await open({ filename: path.join(__dirname, 'server.db'), driver: sqlite3.Database })
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, phone TEXT, password TEXT, type TEXT);
-    CREATE TABLE IF NOT EXISTS firms (id INTEGER PRIMARY KEY, name TEXT, email TEXT, taxNumber TEXT, city TEXT, address TEXT, phone TEXT, loadStatus TEXT, price INTEGER, distanceKm INTEGER, rating REAL, password TEXT);
-    CREATE TABLE IF NOT EXISTS photos (id INTEGER PRIMARY KEY, firmId INTEGER, path TEXT);
-    CREATE TABLE IF NOT EXISTS campaigns (id INTEGER PRIMARY KEY, firmId INTEGER, title TEXT, description TEXT);
-    CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, fromUser TEXT, toFirm INTEGER, content TEXT, createdAt TEXT);
-    CREATE TABLE IF NOT EXISTS prices (id INTEGER PRIMARY KEY, firmId INTEGER, fromCity TEXT, toCity TEXT, price INTEGER, estimatedHours REAL);
-  `)
+// Constants
+const JWT_SECRET = process.env.JWT_SECRET || 'tasimacilik-rehberi-secret-key-2026'
+const JWT_EXPIRES = '7d'
+const SALT_ROUNDS = 10
 
-  // seed if empty
-  const row = await db.get('SELECT COUNT(*) as c FROM firms')
-  if(row.c === 0){
-    await db.run(`INSERT INTO firms (name,email,taxNumber,city,address,phone,loadStatus,price,distanceKm,rating,password) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      ['Metro Taşıma','metro@tasima.com','1234567890','İstanbul','Kadıköy Mah. 15','+90 532 000 0000','Boş',2500,400,4.5,'password'])
-    await db.run(`INSERT INTO firms (name,email,taxNumber,city,address,phone,loadStatus,price,distanceKm,rating,password) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      ['Anadolu Nakliyat','anadolu@nakliyat.com','9876543210','Ankara','Çankaya Cad. 7','+90 532 111 1111','Dolu',3200,250,4.2,'password'])
-    const f1 = await db.get('SELECT id FROM firms WHERE name=?', 'Metro Taşıma')
-    const f2 = await db.get('SELECT id FROM firms WHERE name=?', 'Anadolu Nakliyat')
-    await db.run('INSERT INTO campaigns (firmId,title,description) VALUES (?,?,?)', [f1.id, 'Yaz İndirimi %10','Haziran-Temmuz taşımalarda %10 indirim.'])
-    await db.run('INSERT INTO campaigns (firmId,title,description) VALUES (?,?,?)', [f2.id, 'Hafta Sonu Kampanyası','Cumartesi taşımalarda ekstra ekip.'])
-    // Seed prices
-    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price,estimatedHours) VALUES (?,?,?,?,?)', [f1.id,'İstanbul','Ankara',2500,12])
-    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price,estimatedHours) VALUES (?,?,?,?,?)', [f1.id,'İstanbul','İzmir',1800,8])
-    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price,estimatedHours) VALUES (?,?,?,?,?)', [f2.id,'Ankara','İstanbul',2500,12])
-    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price,estimatedHours) VALUES (?,?,?,?,?)', [f2.id,'Ankara','Gaziantep',3000,14])
+let db
+
+async function tableHasColumn(tableName, columnName) {
+  const columns = await db.all(`PRAGMA table_info(${tableName})`)
+  return columns.some((column) => column.name === columnName)
+}
+
+async function ensureColumn(tableName, columnName, definition) {
+  const exists = await tableHasColumn(tableName, columnName)
+  if (!exists) {
+    await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`)
   }
 }
 
-app.get('/api/firms', async (req,res)=>{
-  const rows = await db.all('SELECT * FROM firms')
-  for(const r of rows){
-    const photos = await db.all('SELECT path FROM photos WHERE firmId=?', r.id)
-    r.photos = photos.map(p=>p.path)
+async function runSchemaMigrations() {
+  await ensureColumn('users', 'updatedAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP')
+
+  await ensureColumn('firms', 'district', 'TEXT')
+  await ensureColumn('firms', 'toCity', 'TEXT')
+  await ensureColumn('firms', 'toDistrict', 'TEXT')
+  await ensureColumn('firms', 'pricePerKm', 'INTEGER')
+  await ensureColumn('firms', 'verified', 'BOOLEAN DEFAULT 0')
+  await ensureColumn('firms', 'updatedAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP')
+
+  await ensureColumn('messages', 'firmId', 'INTEGER')
+  await ensureColumn('messages', 'senderId', 'INTEGER')
+  await ensureColumn('messages', 'senderName', 'TEXT')
+  await ensureColumn('messages', 'senderEmail', 'TEXT')
+  await ensureColumn('messages', 'message', 'TEXT')
+  await ensureColumn('messages', 'read', 'BOOLEAN DEFAULT 0')
+
+  const hasToFirm = await tableHasColumn('messages', 'toFirm')
+  if (hasToFirm) {
+    await db.exec('UPDATE messages SET firmId = COALESCE(firmId, toFirm)')
   }
-  res.json(rows)
-})
 
-app.get('/api/firms/:id', async (req,res)=>{
-  const id = req.params.id
-  const f = await db.get('SELECT * FROM firms WHERE id=?', id)
-  if(!f) return res.status(404).json({error:'not found'})
-  const photos = await db.all('SELECT path FROM photos WHERE firmId=?', id)
-  const campaigns = await db.all('SELECT * FROM campaigns WHERE firmId=?', id)
-  f.photos = photos.map(p=>p.path)
-  f.campaigns = campaigns
-  res.json(f)
-})
+  const hasFromUser = await tableHasColumn('messages', 'fromUser')
+  if (hasFromUser) {
+    await db.exec("UPDATE messages SET senderName = COALESCE(senderName, fromUser)")
+  }
 
-app.get('/api/campaigns', async (req,res)=>{
-  const rows = await db.all('SELECT * FROM campaigns')
-  res.json(rows)
-})
+  const hasContent = await tableHasColumn('messages', 'content')
+  if (hasContent) {
+    await db.exec("UPDATE messages SET message = COALESCE(message, content)")
+  }
 
+  await db.exec("UPDATE messages SET senderName = COALESCE(senderName, 'Anonim')")
+  await db.exec("UPDATE messages SET senderEmail = COALESCE(senderEmail, 'unknown@example.com')")
+  await db.exec("UPDATE messages SET message = COALESCE(message, '')")
+
+  await ensureColumn('prices', 'createdAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP')
+}
+
+async function initDb(){
+  const dbDir = path.dirname(DB_PATH)
+  if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
+
+  db = await open({
+    filename: DB_PATH,
+    driver: sqlite3.Database
+  })
+
+  await db.exec('PRAGMA foreign_keys = ON')
+  
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      phone TEXT,
+      password TEXT NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS firms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      phone TEXT NOT NULL,
+      taxNumber TEXT UNIQUE NOT NULL,
+      city TEXT NOT NULL,
+      district TEXT,
+      toCity TEXT,
+      toDistrict TEXT,
+      description TEXT,
+      loadStatus TEXT DEFAULT 'Boş',
+      price INTEGER,
+      pricePerKm INTEGER,
+      rating REAL DEFAULT 0,
+      password TEXT NOT NULL,
+      verified BOOLEAN DEFAULT 0,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      firmId INTEGER NOT NULL,
+      senderId INTEGER,
+      senderName TEXT NOT NULL,
+      senderEmail TEXT NOT NULL,
+      message TEXT NOT NULL,
+      read BOOLEAN DEFAULT 0,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(firmId) REFERENCES firms(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS prices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      firmId INTEGER NOT NULL,
+      fromCity TEXT NOT NULL,
+      toCity TEXT NOT NULL,
+      price INTEGER NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(firmId) REFERENCES firms(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS photos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      firmId INTEGER,
+      path TEXT NOT NULL,
+      uploadedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(firmId) REFERENCES firms(id) ON DELETE CASCADE
+    );
+
+  `)
+
+  await runSchemaMigrations()
+
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_firms_email ON firms(email)')
+
+  if (await tableHasColumn('messages', 'firmId')) {
+    await db.exec('CREATE INDEX IF NOT EXISTS idx_messages_firmId ON messages(firmId)')
+  }
+
+  if (await tableHasColumn('prices', 'firmId')) {
+    await db.exec('CREATE INDEX IF NOT EXISTS idx_prices_firmId ON prices(firmId)')
+  }
+
+  // Seed data
+  const count = await db.get('SELECT COUNT(*) as c FROM firms')
+  if(count.c === 0){
+    const hashedPassword1 = await hashPassword('password123')
+    const hashedPassword2 = await hashPassword('password123')
+    
+    const r1 = await db.run(
+      `INSERT INTO firms (name,email,taxNumber,city,district,toCity,toDistrict,phone,loadStatus,price,pricePerKm,rating,password,description)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ['Metro Taşıma','metro@tasima.com','1234567890','İstanbul','Kadıköy','Ankara','Çankaya','+90 532 000 0000','Boş',2500,50,4.5,hashedPassword1,'Hızlı ve güvenilir taşımacılık hizmeti']
+    )
+    
+    const r2 = await db.run(
+      `INSERT INTO firms (name,email,taxNumber,city,district,toCity,toDistrict,phone,loadStatus,price,pricePerKm,rating,password,description)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ['Anadolu Nakliyat','anadolu@nakliyat.com','9876543210','Ankara','Çankaya','İstanbul','Kadıköy','+90 532 111 1111','Dolu',3200,55,4.2,hashedPassword2,'Anadolu bölgesinde uzman taşımacılık']
+    )
+
+    // Add sample prices
+    const firm1 = r1.lastID
+    const firm2 = r2.lastID
+    
+    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price) VALUES (?,?,?,?)', [firm1,'İstanbul','Ankara',2500])
+    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price) VALUES (?,?,?,?)', [firm1,'İstanbul','İzmir',1800])
+    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price) VALUES (?,?,?,?)', [firm2,'Ankara','İstanbul',2500])
+    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price) VALUES (?,?,?,?)', [firm2,'Ankara','Gaziantep',3000])
+  }
+  
+  console.log('✅ Database initialized')
+}
+
+// Helper Functions
+function generateToken(data) {
+  return jwt.sign(data, JWT_SECRET, { expiresIn: JWT_EXPIRES })
+}
+
+async function hashPassword(password) {
+  return bcrypt.hash(password, SALT_ROUNDS)
+}
+
+async function comparePassword(password, hash) {
+  return bcrypt.compare(password, hash)
+}
+
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, JWT_SECRET)
+  } catch (error) {
+    return null
+  }
+}
+
+// Middleware: Authentication
+function authMiddleware(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Token required' })
+  }
+
+  const decoded = verifyToken(token)
+  if (!decoded) {
+    return res.status(401).json({ success: false, error: 'Invalid token' })
+  }
+
+  req.user = decoded
+  next()
+}
+
+// ============ USER ENDPOINTS ============
+
+// User Registration
 app.post('/api/register', async (req,res)=>{
-  const body = req.body
-  if(body.type === 'company'){
-    const stmt = await db.run('INSERT INTO firms (name,taxNumber,city,address,phone,loadStatus,price,distanceKm,rating) VALUES (?,?,?,?,?,?,?,?,?)',
-      [body.name||'', body.taxNumber||'', body.city||'', body.address||'', body.phone||'', body.loadStatus||'Boş', body.price||0, body.distanceKm||0, body.rating||4.0])
-    const id = stmt.lastID
-    if(body.photos && Array.isArray(body.photos)){
-      for(const p of body.photos) await db.run('INSERT INTO photos (firmId,path) VALUES (?,?)',[id,p])
+  try {
+    const { name, email, phone, password, confirmPassword } = req.body
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, error: 'Name, email, password gerekli' })
     }
-    const firm = await db.get('SELECT * FROM firms WHERE id=?', id)
-    res.json({ok:true, firm})
-  } else {
-    const stmt = await db.run('INSERT INTO users (name,email,phone,password,type) VALUES (?,?,?,?,?)', [body.name||'', body.email||'', body.phone||'', body.password||'', 'user'])
-    const user = await db.get('SELECT * FROM users WHERE id=?', stmt.lastID)
-    res.json({ok:true, user})
+
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password en az 6 karakter olmalı' })
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, error: 'Passwords eşleşmiyor' })
+    }
+
+    const existing = await db.get('SELECT id FROM users WHERE email = ?', email)
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'Bu email zaten kayıtlı' })
+    }
+
+    const hashedPassword = await hashPassword(password)
+    const result = await db.run(
+      'INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)',
+      [name, email, phone || null, hashedPassword]
+    )
+
+    const user = {
+      id: result.lastID,
+      name,
+      email,
+      phone: phone || null
+    }
+
+    const token = generateToken({ id: user.id, email: user.email })
+
+    res.status(201).json({
+      success: true,
+      message: 'Kayıt başarılı',
+      user,
+      token
+    })
+  } catch (error) {
+    console.error('Register error:', error)
+    if (error?.code === 'SQLITE_CONSTRAINT') {
+      if (String(error?.message || '').includes('users.email')) {
+        return res.status(400).json({ success: false, error: 'Bu email zaten kayıtlı' })
+      }
+      if (String(error?.message || '').includes('users.phone')) {
+        return res.status(400).json({ success: false, error: 'Bu telefon zaten kayıtlı' })
+      }
+      return res.status(400).json({ success: false, error: 'Kayıt bilgileri zaten kullanımda' })
+    }
+    res.status(500).json({ success: false, error: 'Server error' })
   }
 })
 
+// User Login
 app.post('/api/login', async (req,res)=>{
-  const { identifier } = req.body
-  // simple login simulation: find by email or phone in users
-  const user = await db.get('SELECT * FROM users WHERE email=? OR phone=?', identifier, identifier)
-  if(user) return res.json({ok:true,user})
-  return res.status(401).json({ok:false})
+  try {
+    const { identifier, password } = req.body
+
+    if (!identifier || !password) {
+      return res.status(400).json({ success: false, error: 'Email/Telefon ve password gerekli' })
+    }
+
+    const user = await db.get(
+      'SELECT * FROM users WHERE email = ? OR phone = ?',
+      [identifier, identifier]
+    )
+
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Kullanıcı bulunamadı' })
+    }
+
+    const passwordValid = await comparePassword(password, user.password)
+    if (!passwordValid) {
+      return res.status(401).json({ success: false, error: 'Hatalı password' })
+    }
+
+    const token = generateToken({ id: user.id, email: user.email })
+
+    res.json({
+      success: true,
+      message: 'Giriş başarılı',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        isCompany: false
+      },
+      token
+    })
+  } catch (error) {
+    console.error('Login error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
 })
 
-app.post('/api/login-company', async (req,res)=>{
-  const { identifier, taxNumber } = req.body
-  if(!taxNumber) return res.status(400).json({ok:false, error:'Missing tax number'})
-  // Find firm by email/name and verify tax number
-  const firm = await db.get('SELECT * FROM firms WHERE (name=? OR email=?) AND taxNumber=?', identifier, identifier, taxNumber)
-  if(firm) return res.json({ok:true, firm})
-  return res.status(401).json({ok:false})
+// ============ FIRM ENDPOINTS ============
+
+// Firm Registration
+app.post('/api/register-firm', async (req,res)=>{
+  try {
+    const {
+      name, email, phone, taxNumber, city, district,
+      toCity, toDistrict, password, confirmPassword, description
+    } = req.body
+
+    if (!name || !email || !taxNumber || !password || !city || !toCity || !phone) {
+      return res.status(400).json({ success: false, error: 'Tüm gerekli alanları doldurun' })
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password en az 6 karakter olmalı' })
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, error: 'Passwords eşleşmiyor' })
+    }
+
+    const existing = await db.get(
+      'SELECT id FROM firms WHERE email = ? OR taxNumber = ?',
+      [email, taxNumber]
+    )
+    if (existing) {
+      return res.status(400).json({ success: false, error: 'Bu email veya vergi numarası zaten kayıtlı' })
+    }
+
+    const hashedPassword = await hashPassword(password)
+    const result = await db.run(
+      `INSERT INTO firms (
+        name, email, phone, taxNumber, city,
+        district, toCity, toDistrict, password,
+        description, loadStatus
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, email, phone, taxNumber, city, district || null, toCity,
+       toDistrict || null, hashedPassword, description || null, 'Boş']
+    )
+
+    const firm = {
+      id: result.lastID,
+      name,
+      email,
+      phone,
+      taxNumber,
+      isCompany: true
+    }
+
+    const token = generateToken({ id: firm.id, email: firm.email, isCompany: true })
+
+    res.status(201).json({
+      success: true,
+      message: 'Firma kayıt başarılı',
+      user: firm,
+      token
+    })
+  } catch (error) {
+    console.error('Firm registration error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
 })
+
+// Firm Login
+app.post('/api/login-company', async (req,res)=>{
+  try {
+    const { identifier, taxNumber } = req.body
+
+    if (!identifier || !taxNumber) {
+      return res.status(400).json({ success: false, error: 'Firma adı/Email ve vergi numarası gerekli' })
+    }
+
+    const firm = await db.get(
+      'SELECT * FROM firms WHERE (email = ? OR name = ?) AND taxNumber = ?',
+      [identifier, identifier, taxNumber]
+    )
+
+    if (!firm) {
+      return res.status(401).json({ success: false, error: 'Firma bulunamadı' })
+    }
+
+    const token = generateToken({ id: firm.id, email: firm.email, isCompany: true })
+
+    res.json({
+      success: true,
+      message: 'Giriş başarılı',
+      user: {
+        id: firm.id,
+        name: firm.name,
+        email: firm.email,
+        phone: firm.phone,
+        taxNumber: firm.taxNumber,
+        city: firm.city,
+        district: firm.district,
+        toCity: firm.toCity,
+        toDistrict: firm.toDistrict,
+        description: firm.description,
+        loadStatus: firm.loadStatus,
+        price: firm.price,
+        rating: firm.rating,
+        isCompany: true
+      },
+      token
+    })
+  } catch (error) {
+    console.error('Firm login error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+// Get all firms
+app.get('/api/firms', async (req,res)=>{
+  try {
+    const firms = await db.all(`
+      SELECT id, name, email, phone, city, district,
+             toCity, toDistrict, loadStatus, price, pricePerKm,
+             rating, description, createdAt
+      FROM firms
+      ORDER BY createdAt DESC
+    `)
+
+    for (const firm of firms) {
+      const photos = await db.all('SELECT path FROM photos WHERE firmId = ? ORDER BY uploadedAt DESC', [firm.id])
+      firm.photos = photos.map((photo) => photo.path)
+    }
+
+    res.json({ success: true, data: firms })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+// Get single firm
+app.get('/api/firms/:id', async (req,res)=>{
+  try {
+    const firm = await db.get(
+      `SELECT * FROM firms WHERE id = ?`,
+      req.params.id
+    )
+
+    if (!firm) {
+      return res.status(404).json({ success: false, error: 'Firma bulunamadı' })
+    }
+
+    const photos = await db.all('SELECT id, path, uploadedAt FROM photos WHERE firmId = ? ORDER BY uploadedAt DESC', [req.params.id])
+    firm.photos = photos
+
+    res.json({ success: true, data: firm })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+// Update firm
+app.post('/api/firms/:id/update', authMiddleware, async (req,res)=>{
+  try {
+    if (req.user.id !== parseInt(req.params.id)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' })
+    }
+
+    const { name, phone, description, loadStatus, price, pricePerKm, city, district, toCity, toDistrict } = req.body
+
+    await db.run(
+      `UPDATE firms SET name = ?, phone = ?, description = ?,
+        loadStatus = ?, price = ?, pricePerKm = ?,
+        city = ?, district = ?, toCity = ?, toDistrict = ?,
+        updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+      [name, phone, description, loadStatus, price, pricePerKm, city, district, toCity, toDistrict, req.params.id]
+    )
+
+    const firm = await db.get('SELECT * FROM firms WHERE id = ?', req.params.id)
+    res.json({ success: true, message: 'Firma güncellendi', data: firm })
+  } catch (error) {
+    console.error('Update firm error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+// ============ PRICES ENDPOINTS ============
+
+app.get('/api/firms/:id/prices', async (req,res)=>{
+  try {
+    const prices = await db.all(
+      'SELECT id, fromCity, toCity, price, createdAt FROM prices WHERE firmId = ? ORDER BY createdAt DESC',
+      req.params.id
+    )
+
+    res.json({ success: true, data: prices })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.post('/api/firms/:id/prices', authMiddleware, async (req,res)=>{
+  try {
+    if (req.user.id !== parseInt(req.params.id)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' })
+    }
+
+    const { fromCity, toCity, price } = req.body
+
+    if (!fromCity || !toCity || !price) {
+      return res.status(400).json({ success: false, error: 'Tüm alanları doldurun' })
+    }
+
+    const result = await db.run(
+      'INSERT INTO prices (firmId, fromCity, toCity, price) VALUES (?, ?, ?, ?)',
+      [req.params.id, fromCity, toCity, price]
+    )
+
+    res.status(201).json({
+      success: true,
+      message: 'Fiyat eklendi',
+      data: { id: result.lastID, firmId: req.params.id, fromCity, toCity, price }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.delete('/api/prices/:id', authMiddleware, async (req,res)=>{
+  try {
+    const price = await db.get('SELECT firmId FROM prices WHERE id = ?', req.params.id)
+
+    if (!price || price.firmId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' })
+    }
+
+    await db.run('DELETE FROM prices WHERE id = ?', req.params.id)
+    res.json({ success: true, message: 'Fiyat silindi' })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+// ============ MESSAGES ENDPOINTS ============
 
 app.post('/api/messages', async (req,res)=>{
-  const { fromUser, toFirm, content } = req.body
-  await db.run('INSERT INTO messages (fromUser,toFirm,content,createdAt) VALUES (?,?,?,?)', [fromUser,toFirm,content,new Date().toISOString()])
-  res.json({ok:true})
-})
+  try {
+    const { firmId, senderId, senderName, senderEmail, message } = req.body
 
-app.post('/api/upload', upload.single('file'), async (req,res)=>{
-  if(!req.file) return res.status(400).json({error:'no file'})
-  const p = `/uploads/${req.file.filename}`
-  res.json({path:p})
-})
+    if (!firmId || !senderName || !senderEmail || !message) {
+      return res.status(400).json({ success: false, error: 'Tüm alanları doldurun' })
+    }
 
-app.post('/api/auth/google', async (req,res)=>{
-  const { profile } = req.body
-  // Google OAuth simülasyonu: profile.id, profile.email, profile.name
-  const stmt = await db.run('INSERT OR IGNORE INTO users (name,email,phone,password,type) VALUES (?,?,?,?,?)', [profile.name, profile.email, profile.id, 'oauth_google', 'user'])
-  const user = await db.get('SELECT * FROM users WHERE email=?', profile.email)
-  res.json({ok:true, user})
-})
+    const firm = await db.get('SELECT id FROM firms WHERE id = ?', firmId)
+    if (!firm) {
+      return res.status(404).json({ success: false, error: 'Firma bulunamadı' })
+    }
 
-app.post('/api/auth/facebook', async (req,res)=>{
-  const { profile } = req.body
-  // Facebook OAuth simülasyonu
-  const stmt = await db.run('INSERT OR IGNORE INTO users (name,email,phone,password,type) VALUES (?,?,?,?,?)', [profile.name, profile.email, profile.id, 'oauth_facebook', 'user'])
-  const user = await db.get('SELECT * FROM users WHERE email=?', profile.email)
-  res.json({ok:true, user})
-})
+    let result
 
-app.post('/api/auth/phone', async (req,res)=>{
-  const { phone, name } = req.body
-  if(!phone || !name) return res.status(400).json({ok:false, error:'Missing phone or name'})
-  // Telefon numarasıyla kayıt
-  const existing = await db.get('SELECT * FROM users WHERE phone=?', phone)
-  if(existing) return res.json({ok:true, user: existing}) // Zaten kayıtlı
-  const stmt = await db.run('INSERT INTO users (name,email,phone,password,type) VALUES (?,?,?,?,?)', [name, `${phone}@phone.local`, phone, phone, 'user'])
-  const user = await db.get('SELECT * FROM users WHERE id=?', stmt.lastID)
-  res.json({ok:true, user})
+    try {
+      result = await db.run(
+        `INSERT INTO messages (firmId, senderId, senderName, senderEmail, message)
+         VALUES (?, ?, ?, ?, ?)`,
+        [firmId, senderId || null, senderName, senderEmail, message]
+      )
+    } catch (insertError) {
+      const msg = String(insertError?.message || '')
+      const isLegacySchema = msg.includes('NOT NULL constraint failed: messages.fromUser') || msg.includes('no such column: firmId')
+
+      if (!isLegacySchema) {
+        throw insertError
+      }
+
+      result = await db.run(
+        `INSERT INTO messages (fromUser, toFirm, content, firmId, senderId, senderName, senderEmail, message)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [senderName, firmId, message, firmId, senderId || null, senderName, senderEmail, message]
+      )
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Mesaj gönderildi',
+      data: { id: result.lastID, firmId, senderName, senderEmail, message }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
 })
 
 app.get('/api/messages/:firmId', async (req,res)=>{
-  const { firmId } = req.params
-  const messages = await db.all('SELECT * FROM messages WHERE toFirm=? ORDER BY createdAt DESC', firmId)
-  res.json(messages || [])
+  try {
+    const messages = await db.all(
+      `SELECT
+         id,
+         COALESCE(senderName, fromUser) as senderName,
+         senderEmail,
+         COALESCE(message, content) as message,
+         COALESCE(firmId, toFirm) as firmId,
+         senderId,
+         createdAt
+       FROM messages
+       WHERE COALESCE(firmId, toFirm) = ?
+       ORDER BY createdAt DESC
+       LIMIT 50`,
+      req.params.firmId
+    )
+
+    res.json({ success: true, data: messages })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
 })
 
-app.post('/api/firms/:id/update', async (req,res)=>{
-  const { id } = req.params
-  const { name, email, phone, city, address, taxNumber, price, distanceKm } = req.body
-  await db.run('UPDATE firms SET name=?, email=?, phone=?, city=?, address=?, taxNumber=?, price=?, distanceKm=? WHERE id=?',
-    [name, email, phone, city, address, taxNumber, price, distanceKm, id])
-  const firm = await db.get('SELECT * FROM firms WHERE id=?', id)
-  res.json({ok:true, firm})
+// ============ FILE UPLOAD ============
+
+app.post('/api/upload', upload.single('file'), async (req,res)=>{
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Dosya gerekli' })
+    }
+
+    res.json({
+      success: true,
+      data: {
+        fileName: req.file.filename,
+        originalName: req.file.originalname,
+        path: `/uploads/${req.file.filename}`
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
 })
 
-app.post('/api/firms/:id/photos', upload.single('file'), async (req,res)=>{
-  const { id } = req.params
-  if(!req.file) return res.status(400).json({error:'no file'})
-  const path = `/uploads/${req.file.filename}`
-  await db.run('INSERT INTO photos (firmId, path) VALUES (?,?)', [id, path])
-  const photos = await db.all('SELECT path FROM photos WHERE firmId=?', id)
-  res.json({ok:true, photos: photos.map(p=>p.path)})
+app.post('/api/firms/:id/photos', authMiddleware, upload.single('file'), async (req,res)=>{
+  try {
+    if (req.user.id !== parseInt(req.params.id)) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' })
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Dosya gerekli' })
+    }
+
+    const photoPath = `/uploads/${req.file.filename}`
+
+    await db.run('INSERT INTO photos (firmId, path) VALUES (?, ?)', [req.params.id, photoPath])
+
+    const photos = await db.all('SELECT id, path, uploadedAt FROM photos WHERE firmId = ? ORDER BY uploadedAt DESC', [req.params.id])
+
+    res.status(201).json({ success: true, message: 'Fotoğraf yüklendi', photos })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
 })
 
-app.get('/api/firms/:id/prices', async (req,res)=>{
-  const { id } = req.params
-  const prices = await db.all('SELECT * FROM prices WHERE firmId=? ORDER BY id', id)
-  res.json(prices || [])
+// ============ HEALTH CHECK ============
+
+app.get('/api/health', (req,res)=>{
+  res.json({
+    success: true,
+    message: 'Backend is running',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  })
 })
 
-app.post('/api/firms/:id/prices', async (req,res)=>{
-  const { id } = req.params
-  const { fromCity, toCity, price, estimatedHours } = req.body
-  await db.run('INSERT INTO prices (firmId, fromCity, toCity, price, estimatedHours) VALUES (?,?,?,?,?)',
-    [id, fromCity, toCity, price, estimatedHours])
-  const prices = await db.all('SELECT * FROM prices WHERE firmId=?', id)
-  res.json({ok:true, prices})
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir))
+
+  app.get(/^\/(?!api|uploads).*/, (req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'))
+  })
+}
+
+// ============ ERROR HANDLING ============
+
+app.use((req,res)=>{
+  res.status(404).json({ success: false, error: 'Route not found' })
 })
 
-app.delete('/api/prices/:priceId', async (req,res)=>{
-  const { priceId } = req.params
-  await db.run('DELETE FROM prices WHERE id=?', priceId)
-  res.json({ok:true})
+app.use((err,req,res,next)=>{
+  console.error('Error:', err)
+  res.status(500).json({ success: false, error: 'Internal server error' })
 })
 
-const PORT = process.env.PORT || 4000
-initDb().then(()=>{
-  app.listen(PORT, ()=>console.log('Server listening on', PORT))
-}).catch(err=>{console.error(err); process.exit(1)})
+// ============ SERVER START ============
+
+const PORT = process.env.PORT || 3001
+
+async function start(){
+  try {
+    await initDb()
+    app.listen(PORT, ()=>{
+      console.log(`
+╔════════════════════════════════════════╗
+║   Taşımacılık Rehberi Backend         ║
+║   Production Mode with JWT Auth      ║
+╚════════════════════════════════════════╝
+✅ Server running on http://localhost:${PORT}
+📨 API: http://localhost:${PORT}/api
+🔐 JWT Token Authentication: Enabled
+💾 Database: SQLite with bcrypt hashing
+🗄️ DB Path: ${DB_PATH}
+📦 Multer: File Upload Ready
+🌐 Frontend: ${fs.existsSync(distDir) ? 'Serving dist/ from backend' : 'Not built yet (run npm run build:prod)'}
+
+Demo Credentials:
+📧 Firma: metro@tasima.com / Tax: 1234567890 / Pass: password123
+📧 Firma: anadolu@nakliyat.com / Tax: 9876543210 / Pass: password123
+      `)
+    })
+  } catch (error) {
+    console.error('Failed to start server:', error)
+    process.exit(1)
+  }
+}
+
+start()
+
+export default app

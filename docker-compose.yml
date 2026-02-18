@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    container_name: tasimacilik-rehberi-app
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_PATH=/data/server.db
+    volumes:
+      - app_data:/data
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  app_data:

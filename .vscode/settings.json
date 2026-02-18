@@ -1,0 +1,16 @@
+{
+  "explorer.compactFolders": true,
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "package.json": "package-lock.json,.npmrc,.nvmrc",
+    "docker-compose.yml": "Dockerfile,.dockerignore",
+    ".env": ".env.example",
+    "README.md": "docs/*.md"
+  },
+  "files.exclude": {
+    "**/.vite": true,
+    "**/.expo": true,
+    "**/.DS_Store": true
+  }
+}

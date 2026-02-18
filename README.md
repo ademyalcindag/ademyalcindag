@@ -1,36 +1,57 @@
-# Taşımacılık Rehberi — Minimal React Proof-of-Concept
+# Taşımacılık Rehberi
 
-Bu repo şehirler arası taşımacılık firmalarını listeleyen, filtreleme yapan ve firma profilleri üzerinden mesajlaşma simülasyonu sunan minimal bir React uygulamasıdır. Yerel olarak hostlamayı planlıyorsanız bu kodu kendi sunucunuza deploy edebilirsiniz.
+Web + mobil istemcisi olan, JWT kimlik doğrulama ve kalıcı veritabanı (SQLite dosyası) kullanan taşımacılık platformu.
 
-Çalıştırma:
+## Özellikler
+
+- Kullanıcı kayıt / giriş
+- Firma kayıt / giriş
+- Firma profil güncelleme
+- Firma fiyat listesi ekleme/silme
+- Firma mesajlaşma
+- Fotoğraf yükleme
+- Mobil uygulama (Expo) API entegrasyonu
+
+## Yerel Geliştirme
 
 ```bash
 npm install
-npm run dev
+npm run server   # API: http://localhost:3001
+npm run dev      # Web: http://localhost:5173
 ```
 
-Özellikler (POC):
-- Anasayfada firma listesi ve filtreler (şehir, fiyat, yük durumu)
-- Firma profili: adres, vergi no, kampanyalar, fotoğraflar ve "Mesaj At" simülasyonu
-- Kayıt / Giriş ekranı (sosyal butonlar simülasyon)
-- Kampanyalar sayfası
-- Minimal admin paneli
+> Vite proxy varsayılan olarak `http://localhost:3001` backend’ine gider.
 
-Notlar:
-- Bu POC backend içermez; gerçek kayıt, oturum ve mesajlaşma için bir API/DB eklemelisiniz.
-## Hi there 👋
+## Tek Servis Prod Çalıştırma
 
-<!--
-**ademyalcindag/ademyalcindag** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+Web build’i backend tarafından da servis edilir:
 
-Here are some ideas to get you started:
+```bash
+npm install
+npm run build:prod
+npm run start:prod
+```
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+Bu modda hem API hem web aynı porttan çalışır (varsayılan `3001`).
+
+## Docker ile Yayın Benzeri Kurulum
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+- Uygulama: `http://localhost:3001`
+- API health: `http://localhost:3001/api/health`
+- Veritabanı: `/data/server.db` (named volume ile kalıcı)
+
+## Mobil Uygulama (Gerçek Backend)
+
+Mobil uygulama varsayılan olarak Expo host’un IP’sini kullanarak `:3001/api` endpointine bağlanır.
+
+Gerekirse manuel API URL ver:
+
+```bash
+cd mobile
+EXPO_PUBLIC_API_URL=https://senin-domainin.com/api npx expo start
+```

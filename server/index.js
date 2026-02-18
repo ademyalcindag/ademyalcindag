@@ -655,6 +655,11 @@ app.post('/api/messages', async (req,res)=>{
 
 app.get('/api/messages/:firmId', async (req,res)=>{
   try {
+    const firmId = Number(req.params.firmId)
+    if (!Number.isInteger(firmId) || firmId <= 0) {
+      return res.status(400).json({ success: false, error: 'Geçersiz firma ID' })
+    }
+
     const messages = await db.all(
       `SELECT
          id,
@@ -668,7 +673,7 @@ app.get('/api/messages/:firmId', async (req,res)=>{
        WHERE COALESCE(firmId, toFirm) = ?
        ORDER BY createdAt DESC
        LIMIT 50`,
-      req.params.firmId
+      firmId
     )
 
     res.json({ success: true, data: messages })

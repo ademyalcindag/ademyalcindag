@@ -1,18 +1,31 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, TextInput, Button, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-let WebViewComponent: any = null;
-try {
-  WebViewComponent = require('react-native-webview').WebView;
-} catch (e) {
-  WebViewComponent = null;
-}
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 
 export default function WebScreen() {
   const [url, setUrl] = useState('https://tasimacilik-web.loca.lt');
   const [loading, setLoading] = useState(false);
+  const [WebViewComponent, setWebViewComponent] = useState<any>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    if (Platform.OS !== 'web') {
+      import('react-native-webview')
+        .then((module) => {
+          if (mounted) setWebViewComponent(() => module.WebView);
+        })
+        .catch(() => {
+          if (mounted) setWebViewComponent(null);
+        });
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <ThemedView style={styles.container}>
@@ -29,11 +42,12 @@ export default function WebScreen() {
         <Button
           title="Open"
           onPress={() => {
-            if (WebViewComponent) {
-              setLoading(true);
-            } else {
+            if (Platform.OS === 'web' || !WebViewComponent) {
               WebBrowser.openBrowserAsync(url);
+              return;
             }
+
+            setLoading(true);
           }}
         />
       </View>

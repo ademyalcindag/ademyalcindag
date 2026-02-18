@@ -24,7 +24,7 @@ export default function CompanyProfile(){
 
       <section className="photos">
         <h3>Fotoğraflar</h3>
-        <div className="photo-grid">{firm.photos.length? firm.photos.map((p,i)=>(<img key={i} src={p} alt="foto"/>)) : <div className="placeholder">Fotoğraf yok</div>}</div>
+        <div className="photo-grid">{firm.photos?.length ? firm.photos.map((p,i)=>(<img key={p.id || i} src={p.path || p} alt="foto"/>)) : <div className="placeholder">Fotoğraf yok</div>}</div>
       </section>
 
       <section className="campaigns">
@@ -45,7 +45,18 @@ export default function CompanyProfile(){
               <button className="btn" onClick={()=>setMessageOpen(false)}>İptal</button>
               <button className="btn primary" onClick={async ()=>{
                 const content = document.getElementById('msgText').value
-                await API.sendMessage({fromUser:'Anonim', toFirm: firm.id, content})
+                const auth = JSON.parse(localStorage.getItem('userAuth') || 'null')
+                const result = await API.sendMessage({
+                  firmId: firm.id,
+                  senderId: auth?.id,
+                  senderName: auth?.name || 'Anonim',
+                  senderEmail: auth?.email || 'unknown@example.com',
+                  message: content,
+                })
+                if (!result.ok) {
+                  alert(result.error || 'Mesaj gönderilemedi')
+                  return
+                }
                 alert('Mesaj gönderildi')
                 setMessageOpen(false)
               }}>Gönder</button>

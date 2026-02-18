@@ -16,20 +16,22 @@ export default function Auth(){
     if(!loginType) return alert('Giriş türünü seçin')
     
     if(loginType === 'user'){
-      const res = await API.login(identifier)
+      const res = await API.login(identifier, password)
       if(res.ok) {
         alert('Giriş başarılı!')
         localStorage.setItem('userAuth', JSON.stringify(res.user))
+        if (res.token) localStorage.setItem('authToken', res.token)
         navigate('/')
-      } else alert('Kullanıcı bulunamadı')
+      } else alert(res.error || 'Kullanıcı bulunamadı')
     } else {
       // Firma login: email/taxNumber ile doğrula
       const res = await API.loginCompany(identifier, taxNumber)
       if(res.ok) {
         alert('Giriş başarılı!')
-        localStorage.setItem('companyAuth', JSON.stringify(res.firm))
+        localStorage.setItem('companyAuth', JSON.stringify(res.user))
+        if (res.token) localStorage.setItem('authToken', res.token)
         navigate('/company/dashboard')
-      } else alert('Firma bulunamadı veya vergi numarası yanlış')
+      } else alert(res.error || 'Firma bulunamadı veya vergi numarası yanlış')
     }
     setIdentifier('')
     setPassword('')
@@ -72,15 +74,17 @@ export default function Auth(){
     if(res.ok) {
       if(accountType === 'user'){
         localStorage.setItem('userAuth', JSON.stringify(res.user || res))
+        if (res.token) localStorage.setItem('authToken', res.token)
         navigate('/')
       } else if(accountType === 'company'){
-        localStorage.setItem('companyAuth', JSON.stringify(res.firm || res))
+        localStorage.setItem('companyAuth', JSON.stringify(res.user || res))
+        if (res.token) localStorage.setItem('authToken', res.token)
         navigate('/company/dashboard')
       }
       setMode('login')
       setAccountType(null)
     } else {
-      alert('Kayıt sırasında hata oluştu')
+      alert(res.error || 'Kayıt sırasında hata oluştu')
     }
   }
 
@@ -91,6 +95,7 @@ export default function Auth(){
     const result = await API.loginPhone(phone, name)
     if(result.ok) {
       localStorage.setItem('userAuth', JSON.stringify(result.user))
+      localStorage.removeItem('authToken')
       navigate('/')
       setMode('login')
       setAccountType(null)

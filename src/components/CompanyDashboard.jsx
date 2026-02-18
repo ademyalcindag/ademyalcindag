@@ -34,6 +34,7 @@ export default function CompanyDashboard(){
 
   const handleLogout = () => {
     localStorage.removeItem('companyAuth')
+    localStorage.removeItem('authToken')
     navigate('/auth')
   }
 
@@ -44,6 +45,8 @@ export default function CompanyDashboard(){
     if(result.ok) {
       setFirm(result.firm)
       alert('Firma bilgileri güncellendi')
+    } else {
+      alert(result.error || 'Güncelleme başarısız')
     }
     setLoading(false)
   }
@@ -58,6 +61,8 @@ export default function CompanyDashboard(){
     if(result.ok) {
       setFirm({...firm, photos: result.photos})
       alert('Fotoğraf yüklendi')
+    } else {
+      alert(result.error || 'Fotoğraf yükleme başarısız')
     }
     setLoading(false)
   }
@@ -74,6 +79,8 @@ export default function CompanyDashboard(){
       setPrices(result.prices)
       setNewPrice({fromCity:'', toCity:'', price:'', estimatedHours:''})
       alert('Fiyat eklendi')
+    } else {
+      alert(result.error || 'Fiyat eklenemedi')
     }
     setLoading(false)
   }
@@ -84,6 +91,8 @@ export default function CompanyDashboard(){
     if(result.ok) {
       setPrices(prices.filter(p => p.id !== priceId))
       alert('Fiyat silindi')
+    } else {
+      alert(result.error || 'Fiyat silinemedi')
     }
   }
 
@@ -192,8 +201,8 @@ export default function CompanyDashboard(){
           {firm.photos && firm.photos.length > 0 ? (
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'15px'}}>
               {firm.photos.map(photo => (
-                <div key={photo.id} style={{borderRadius:'5px',overflow:'hidden',boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}}>
-                  <img src={photo.path} alt="Firma Fotosu" style={{width:'100%',height:'200px',objectFit:'cover'}} />
+                <div key={photo.id || photo} style={{borderRadius:'5px',overflow:'hidden',boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}}>
+                  <img src={photo.path || photo} alt="Firma Fotosu" style={{width:'100%',height:'200px',objectFit:'cover'}} />
                 </div>
               ))}
             </div>

@@ -1,52 +1,20 @@
 # 📱 Taşımacılık Rehberi - Mobil Uygulaması
 
-Modern React Native ve Expo tabanlı, tam fonksiyonlu bir ulaştırma/taşımacılık hizmetleri mobil uygulaması.
+Expo tabanlı mobil kabuk içinde web uygulamasını birebir gösteren (WebView) sürüm.
 
 ## 🎯 Özellikler
 
-### 👤 Kullanıcılar İçin
-- **Şirket Arama**: Türkiye'deki tüm şehir ve ilçelerde taşımacı araması
-- **Filtreleme**: Başlangıç/hedef şehri, fiyat aralığı, yük durumuna göre filtreleme
-- **Detay Görüntüleme**: Şirket hakkında detaylı bilgi
-- **İletişim**: Doğrudan şirketlere mesaj gönderme
-- **Profil Yönetimi**: Kişisel bilgileri düzenleme
-
-### 🏢 Şirketler İçin
-- **Firma Paneli**: Kendi şirket bilgilerini yönetme
-- **Rota Yönetimi**: Farklı rotalar için fiyat ekleme/silme
-- **Mesaj Takibi**: Müşteri mesajlarını görüntüleme
-- **Status Güncellemesi**: Yük durumunu (Boş/Dolu) güncelleme
+- **Web ile birebir görünüm**: Mobil uygulama, web arayüzünü doğrudan render eder.
+- **Aynı kullanım akışı**: Menü, sayfalar, formlar ve tüm UI davranışı web ile aynıdır.
+- **Aynı backend**: Mobil kabuk, web uygulamanın kullandığı aynı API akışını çalıştırır.
+- **Tek kod tabanı avantajı**: Webdeki stil/akış güncellemesi mobilde de otomatik yansır.
 
 ## 📋 Ekranlar
 
-### 1. Giriş Ekranı (LoginScreen)
-- Bireysel/Firma giriş seçeneği
-- E-mail/Telefon ile giriş
-- Vergi numarası doğrulaması (Firmalar için)
-
-### 2. Ana Sayfa (HomeScreen)
-- Firma listesi görüntüleme
-- Gelişmiş filtreleme sistemi
-- Realtime arama
-
-### 3. Firma Detayları (CompanyDetailsScreen)
-- Tam firma bilgileri
-- Rota ve fiyat detayları
-- Mesaj gönderme formu
-
-### 4. Profil (ProfileScreen)
-- Kullanıcı bilgilerini görüntüleme/düzenleme
-- Ayarlar
-- Çıkış yapma
-
-### 5. Mesajlar (MessagesScreen)
-- Firma hesapları için gelen mesajları görüntüleme
-- Mesaj detayları ve iletişim bilgileri
-
-### 6. Firma Paneli (CompanyDashboardScreen)
-- Firma bilgilerini düzenleme
-- Rota fiyatlarını yönetme
-- Yük durumu güncelleme
+### 1. Uygulama (WebView)
+- `app/(tabs)/index.tsx` içinde web uygulama URL'sini açar.
+- iOS ve Android'de doğrudan uygulama içinde çalışır.
+- Expo web çalıştırmasında "Tarayıcıda Aç" ile aynı adrese gider.
 
 ## 🚀 Kurulum
 
@@ -62,10 +30,10 @@ cd mobile
 npm install
 ```
 
-2. **Ortam Değişkenlerini Ayarla** (opsiyonel)
+2. **Ortam Değişkenlerini Ayarla** (önerilir)
 ```bash
-# .env dosyası oluştur
-EXPO_PUBLIC_API_URL=http://localhost:3001/api
+# .env dosyası oluştur (mobilin açacağı web uygulama adresi)
+EXPO_PUBLIC_WEB_APP_URL=http://localhost:5173
 ```
 
 3. **Uygulamayı Çalıştır**
@@ -75,7 +43,7 @@ EXPO_PUBLIC_API_URL=http://localhost:3001/api
 npm run web
 ```
 
-**iOS Simulator'da Çalıştır:**
+**iOS Simulator'da Çalıştır (yalnızca macOS):**
 ```bash
 npm run ios
 ```
@@ -104,6 +72,13 @@ npm start
    - Terminal'deki QR kodu telefon kamerası ile tara
    - Expo Go'da otomatik olarak açılacak
 
+## 🍎 iOS Notu (Önemli)
+
+- Bu geliştirme ortamı Linux olduğu için iOS Simulator bu makinede açılamaz.
+- iOS'ta test için iki yol:
+   - **Fiziksel iPhone + Expo Go** (QR ile)
+   - **macOS üzerinde** `npm run ios`
+
 ## 🔐 Giriş Bilgileri (Demo)
 
 ### Kullanıcı Örneği
@@ -118,16 +93,9 @@ npm start
 
 ```
 mobile/
-├── App.js                 # Ana uygulama bileşeni
-├── api.js                 # API istemcisi
-├── constants.js           # Sabitler (renkler, şehirler vb.)
-├── screens/              # Ekran bileşenleri
-│   ├── LoginScreen.jsx
-│   ├── HomeScreen.jsx
-│   ├── CompanyDetailsScreen.jsx
-│   ├── ProfileScreen.jsx
-│   ├── MessagesScreen.jsx
-│   └── CompanyDashboardScreen.jsx
+├── app/(tabs)/index.tsx   # WebView ile web uygulama ekranı
+├── app/(tabs)/_layout.tsx # Alt sekme düzeni
+├── app/_layout.tsx        # Root router düzeni
 ├── package.json
 └── app.json
 ```

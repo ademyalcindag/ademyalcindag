@@ -1,51 +1,40 @@
-# Welcome to your Expo app 👋
+# Taşımacılık Rehberi Mobil
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Bu mobil proje, web uygulamayı **birebir** (CSS, animasyon, tema paleti, sayfa akışları dahil) WebView içinde çalıştırır.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Çalıştırma
 
 ```bash
-npm run reset-project
+cd mobile
+npm install
+npm start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Tek komutla web + mobil
 
-## Learn more
+Proje kök dizininden:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm run mobile:start
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Bu komut web uygulamayı (`vite`, port `5173`) ve Expo mobil geliştirme sunucusunu birlikte başlatır.
 
-## Join the community
+## Önerilen ortam değişkeni
 
-Join our community of developers creating universal apps.
+`.env` dosyasında mobilin açacağı web adresini tanımlayın:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-a
+```bash
+EXPO_PUBLIC_WEB_APP_URL=http://localhost:5173
+```
+
+Tanımlanmazsa uygulama, geliştirici makinesinin IP/host bilgisinden otomatik URL üretmeyi dener.
+
+## Mimari
+
+- `app/index.tsx`: WebView ile web uygulamayı açar
+- `app/_layout.tsx`: Tek ekran root stack
+
+## Hedef
+
+Mobilde görülen ekran, web uygulamanın birebir aynısıdır. Webde yapılan görsel/tema/animasyon güncellemeleri mobilde de aynı şekilde görünür.

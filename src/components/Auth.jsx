@@ -44,11 +44,7 @@ export default function Auth(){
 
   function selectAccountType(type){
     setAccountType(type)
-    if(type === 'phone'){
-      setMode('phone-register')
-    } else {
-      setMode('register')
-    }
+    setMode('register')
   }
 
   async function handleRegister(e){
@@ -86,20 +82,6 @@ export default function Auth(){
     } else {
       alert(res.error || 'Kayıt sırasında hata oluştu')
     }
-  }
-
-  async function handlePhoneRegister(e){
-    e.preventDefault()
-    const phone = e.target.phone.value
-    const name = e.target.name.value
-    const result = await API.loginPhone(phone, name)
-    if(result.ok) {
-      localStorage.setItem('userAuth', JSON.stringify(result.user))
-      localStorage.removeItem('authToken')
-      navigate('/')
-      setMode('login')
-      setAccountType(null)
-    } else alert('Hata oluştu')
   }
 
   function handleSocialLogin(provider){
@@ -200,14 +182,6 @@ export default function Auth(){
               >
                 🏢 Firma Hesabı
               </button>
-              <button 
-                type="button" 
-                className="btn" 
-                style={{padding:'16px', fontSize:'16px', fontWeight:'600', background:'#a9c400', color:'white', border:'none'}}
-                onClick={() => selectAccountType('phone')}
-              >
-                📱 Telefon ile Kayıt
-              </button>
             </div>
             <button type="button" className="btn" style={{marginTop:'16px', width:'100%'}} onClick={()=>{setMode('login'); setAccountType(null)}}>Geri</button>
           </div>
@@ -255,17 +229,6 @@ export default function Auth(){
           </form>
         )}
 
-        {mode === 'phone-register' && (
-          <form className="form" onSubmit={handlePhoneRegister}>
-            <h3 style={{marginTop:0, color:'var(--primary)'}}>Telefon ile Kayıt</h3>
-            <label>Ad Soyad<input name="name" required /></label>
-            <label>Telefon Numarası<input type="tel" name="phone" placeholder="+90 5XX XXX XXXX" required /></label>
-            <div style={{display:'flex', gap:'8px', marginTop:'16px'}}>
-              <button type="submit" className="btn primary" style={{flex:1}}>Kayıt Ol</button>
-              <button type="button" className="btn" style={{flex:1}} onClick={()=>{setMode('account-type'); setAccountType(null)}}>Geri</button>
-            </div>
-          </form>
-        )}
       </div>
     </div>
   )

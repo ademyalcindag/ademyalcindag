@@ -211,6 +211,36 @@ export const API = {
     return parsed.ok ? { ok: true } : { ok: false, error: parsed.error }
   },
 
+  async getQuote(payload) {
+    const res = await fetch(buildUrl('/api/quotes'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify(payload),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, data: parsed.raw?.data } : { ok: false, error: parsed.error }
+  },
+
+  async checkoutWithCard(payload) {
+    const res = await fetch(buildUrl('/api/payments/checkout'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify(payload),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, data: parsed.raw?.data } : { ok: false, error: parsed.error }
+  },
+
+  async verifyThreeDSecure(payload) {
+    const res = await fetch(buildUrl('/api/payments/3d-secure/verify'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify(payload),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, message: parsed.raw?.message } : { ok: false, error: parsed.error }
+  },
+
   async loginGoogle(profile) {
     return { ok: true, user: profile }
   },

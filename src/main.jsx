@@ -4,9 +4,11 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles.css'
 
+const appBase = import.meta.env.VITE_APP_BASE || '/'
+
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={appBase}>
       <App />
     </BrowserRouter>
   </React.StrictMode>

@@ -1,0 +1,9 @@
+id,fromUser,toFirm,content,isRead,createdAt,firmId,senderId,senderName,senderEmail,message,read
+1,Anonim,1,adem yalçındağ,0,2026-02-18 17:55:04,1,,Anonim,unknown@example.com,adem yalçındağ,0
+2,Anonim,2,"adem yalçınağ
+",0,2026-02-18 18:09:15,2,,Anonim,unknown@example.com,"adem yalçınağ
+",0
+3,Anonim,1,sdgvsgd,0,2026-02-18 18:09:44,1,,Anonim,unknown@example.com,sdgvsgd,0
+4,Anonim,2,adsadasd,0,2026-02-18 18:14:31,2,,Anonim,unknown@example.com,adsadasd,0
+5,Smoke qn5v5cxp,1,Smoke test mesajı qn5v5cxp,0,2026-02-18 18:52:21,1,7,Smoke qn5v5cxp,smoke_qn5v5cxp@mail.com,Smoke test mesajı qn5v5cxp,0
+6,Smoke brn4o52e,1,Smoke test mesajı brn4o52e,0,2026-02-18 18:54:00,1,8,Smoke brn4o52e,smoke_brn4o52e@mail.com,Smoke test mesajı brn4o52e,0

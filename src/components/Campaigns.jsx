@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react'
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+function buildUrl(path) {
+  return API_BASE_URL ? `${API_BASE_URL}${path}` : path
+}
+
 export default function Campaigns(){
   const [campaigns, setCampaigns] = useState([])
   
   useEffect(() => {
-    fetch('/api/campaigns').then(r => r.ok ? r.json() : []).then(setCampaigns).catch(err => console.error(err))
+    fetch(buildUrl('/api/campaigns'))
+      .then(r => r.ok ? r.json() : [])
+      .then(setCampaigns)
+      .catch(err => console.error(err))
   }, [])
   
   return (

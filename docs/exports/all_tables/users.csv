@@ -1,0 +1,9 @@
+id,name,email,phone,password,type,createdAt,updatedAt
+1,Test User,user@example.com,+90 500 123 4567,$2a$10$zbH5r9T73jOU0cUqGhT.9uNqsMSG9Olz1j1ps3wXzbLrpGO6rKOrW,user,2025-12-22 07:34:30,2025-12-22 07:34:30
+2,Test User,test1771434442@example.com,+905550001122,$2a$10$qUxdXXvU2msm4Rbt8qJrBegVtfg7VTVbnKKl8u53/yFqlULE./Kua,user,2026-02-18 17:07:22,2026-02-18 17:07:22
+3,Verify User,verify1771434676@example.com,+905550009999,$2a$10$Hjqn1IeYGltnAP4HRjE2A.GnccJMyC5kgplNuk7jmIBjfNtC8xgPe,user,2026-02-18 17:11:16,2026-02-18 17:11:16
+4,Verify User,verify1771434864@example.com,+905551434864,$2a$10$55ww8Mgh2jfYNTVugv7ZkOTXN/woP35F4j2/1OZczoRZ8MaFJk/NS,user,2026-02-18 17:14:24,2026-02-18 17:14:24
+5,Verify User,verify1771434895@example.com,+905551434895,$2a$10$iBmHARaxRBzz53xeDx5wx.74P2mlUpdvAOWqdLSMqUr4v/07o48Xe,user,2026-02-18 17:14:55,2026-02-18 17:14:55
+6,adem yalçındağ,ademyalcindag@gmail.com,5427146326,$2a$10$ltiBLUrjE2i.FeHUczsezusQL2Y10/l3fHkiTBO/WoUvVb5EMaSTm,user,2026-02-18 17:56:04,2026-02-18 17:56:04
+7,Smoke qn5v5cxp,smoke_qn5v5cxp@mail.com,+905553430957,$2a$10$8fZrsMIQWt2ylPmDo3x4YujSaKpu5UlDyPCdXhRhpIJ5O7uEp6Rwa,user,2026-02-18 18:52:21,2026-02-18 18:52:21
+8,Smoke brn4o52e,smoke_brn4o52e@mail.com,+905555913554,$2a$10$E0ShyMrD7CJudu2AOJ33wOqN1GFPue8TzVD3lSqMCYx0HR7rjTVQC,user,2026-02-18 18:54:00,2026-02-18 18:54:00

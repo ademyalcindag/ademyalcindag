@@ -183,6 +183,33 @@ async function initDb(){
       FOREIGN KEY(firmId) REFERENCES firms(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS booking_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      firmId INTEGER NOT NULL,
+      fromCity TEXT NOT NULL,
+      toCity TEXT NOT NULL,
+      moveDate TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      currency TEXT DEFAULT 'TRY',
+      status TEXT DEFAULT 'pending_3d',
+      cardHolder TEXT,
+      maskedCard TEXT,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(firmId) REFERENCES firms(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bookingId INTEGER NOT NULL,
+      status TEXT DEFAULT 'pending_3d',
+      threeDSCode TEXT,
+      threeDSVerifiedAt DATETIME,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(bookingId) REFERENCES booking_orders(id) ON DELETE CASCADE
+    );
+
   `)
 
   await runSchemaMigrations()
@@ -601,6 +628,177 @@ app.delete('/api/prices/:id', authMiddleware, async (req,res)=>{
     await db.run('DELETE FROM prices WHERE id = ?', req.params.id)
     res.json({ success: true, message: 'Fiyat silindi' })
   } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+// ============ QUOTE & CHECKOUT ENDPOINTS ============
+
+async function resolveRoutePrice(firmId, fromCity, toCity) {
+  const customPrice = await db.get(
+    `SELECT price
+     FROM prices
+     WHERE firmId = ?
+       AND LOWER(fromCity) = LOWER(?)
+       AND LOWER(toCity) = LOWER(?)
+     ORDER BY id DESC
+     LIMIT 1`,
+    [firmId, fromCity, toCity]
+  )
+
+  if (customPrice?.price) {
+    return Number(customPrice.price)
+  }
+
+  const firm = await db.get('SELECT price, pricePerKm FROM firms WHERE id = ?', [firmId])
+  if (!firm) {
+    return null
+  }
+
+  const fallback = Number(firm.price || firm.pricePerKm || 0)
+  return fallback > 0 ? fallback : null
+}
+
+function maskCardNumber(cardNumber) {
+  const digits = String(cardNumber || '').replace(/\D/g, '')
+  if (digits.length < 4) return '**** **** **** ****'
+  return `**** **** **** ${digits.slice(-4)}`
+}
+
+app.post('/api/quotes', async (req, res) => {
+  try {
+    const { firmId, fromCity, toCity, moveDate } = req.body
+
+    if (!firmId || !fromCity || !toCity || !moveDate) {
+      return res.status(400).json({ success: false, error: 'Firma, güzergah ve tarih zorunludur' })
+    }
+
+    const firm = await db.get('SELECT id, name FROM firms WHERE id = ?', [firmId])
+    if (!firm) {
+      return res.status(404).json({ success: false, error: 'Firma bulunamadı' })
+    }
+
+    const amount = await resolveRoutePrice(firmId, fromCity, toCity)
+    if (!amount) {
+      return res.status(404).json({ success: false, error: 'Bu rota için fiyat bulunamadı' })
+    }
+
+    res.json({
+      success: true,
+      data: {
+        firmId,
+        firmName: firm.name,
+        fromCity,
+        toCity,
+        moveDate,
+        amount,
+        currency: 'TRY'
+      }
+    })
+  } catch (error) {
+    console.error('Quote error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.post('/api/payments/checkout', async (req, res) => {
+  try {
+    const {
+      firmId,
+      fromCity,
+      toCity,
+      moveDate,
+      cardHolder,
+      cardNumber,
+      expiry,
+      cvv
+    } = req.body
+
+    if (!firmId || !fromCity || !toCity || !moveDate || !cardHolder || !cardNumber || !expiry || !cvv) {
+      return res.status(400).json({ success: false, error: 'Ödeme için tüm alanlar zorunludur' })
+    }
+
+    const amount = await resolveRoutePrice(firmId, fromCity, toCity)
+    if (!amount) {
+      return res.status(404).json({ success: false, error: 'Bu rota için fiyat bulunamadı' })
+    }
+
+    const booking = await db.run(
+      `INSERT INTO booking_orders
+       (firmId, fromCity, toCity, moveDate, amount, status, cardHolder, maskedCard)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [firmId, fromCity, toCity, moveDate, amount, 'pending_3d', cardHolder, maskCardNumber(cardNumber)]
+    )
+
+    const threeDSCode = '123456'
+
+    const payment = await db.run(
+      `INSERT INTO payment_transactions
+       (bookingId, status, threeDSCode)
+       VALUES (?, ?, ?)`,
+      [booking.lastID, 'pending_3d', threeDSCode]
+    )
+
+    res.status(201).json({
+      success: true,
+      message: '3D Secure doğrulaması gerekli',
+      data: {
+        bookingId: booking.lastID,
+        paymentId: payment.lastID,
+        amount,
+        currency: 'TRY',
+        threeDSecureRequired: true,
+        demoOtp: threeDSCode
+      }
+    })
+  } catch (error) {
+    console.error('Checkout error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.post('/api/payments/3d-secure/verify', async (req, res) => {
+  try {
+    const { paymentId, otp } = req.body
+
+    if (!paymentId || !otp) {
+      return res.status(400).json({ success: false, error: 'Payment ID ve OTP zorunludur' })
+    }
+
+    const payment = await db.get(
+      'SELECT id, bookingId, status, threeDSCode FROM payment_transactions WHERE id = ?',
+      [paymentId]
+    )
+
+    if (!payment) {
+      return res.status(404).json({ success: false, error: 'Ödeme kaydı bulunamadı' })
+    }
+
+    if (payment.status === 'paid') {
+      return res.json({ success: true, message: 'Ödeme zaten tamamlanmış' })
+    }
+
+    if (String(payment.threeDSCode) !== String(otp)) {
+      return res.status(400).json({ success: false, error: '3D Secure kodu hatalı' })
+    }
+
+    await db.run(
+      `UPDATE payment_transactions
+       SET status = 'paid', threeDSVerifiedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [paymentId]
+    )
+
+    await db.run(
+      `UPDATE booking_orders
+       SET status = 'paid', updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [payment.bookingId]
+    )
+
+    res.json({ success: true, message: 'Ödeme başarılı, rezervasyon oluşturuldu' })
+  } catch (error) {
+    console.error('3D verify error:', error)
     res.status(500).json({ success: false, error: 'Server error' })
   }
 })

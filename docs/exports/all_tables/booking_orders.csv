@@ -1,0 +1,12 @@
+id,firmId,fromCity,toCity,moveDate,amount,currency,status,cardHolder,maskedCard,createdAt,updatedAt,distanceKm
+1,1,İstanbul,Ankara,2026-02-20,22500,TRY,pending_3d,Test User,**** **** **** 0000,2026-02-20 05:55:44,2026-02-20 05:55:44,450
+2,1,İstanbul,Ankara,2026-02-20,6000,TRY,paid,Test User,**** **** **** 0000,2026-02-20 06:01:21,2026-02-20 06:01:33,120
+3,3,Ankara,Isparta,2026-02-20,18900,TRY,paid,adem yalçındağ,**** **** **** 1569,2026-02-20 06:07:42,2026-02-20 06:07:51,450
+4,3,İstanbul,İzmir,2026-02-21,16800,TRY,pending_3d,Test User,**** **** **** 1111,2026-02-20 06:27:38,2026-02-20 06:27:38,400
+5,3,İstanbul,İzmir,2026-02-21,16800,TRY,pending_3d,Test User,**** **** **** 1111,2026-02-20 06:27:48,2026-02-20 06:27:48,400
+6,3,İstanbul,İzmir,2026-02-21,16800,TRY,paid,Test User,**** **** **** 1111,2026-02-20 06:29:37,2026-02-20 06:31:04,400
+7,3,Şehitkamil,Onikişubat,2026-02-20,189000,TRY,paid,adem yalçındağ,**** **** **** 2345,2026-02-20 06:31:58,2026-02-20 06:32:03,4500
+8,3,Şehitkamil,Onikişubat,2026-02-20,189000,TRY,pending_3d,ADEM YALÇINDAĞ,**** **** **** 4231,2026-02-20 06:41:59,2026-02-20 06:41:59,4500
+9,3,Şehitkamil,Etimesgut,2026-02-21,30492,TRY,paid,ADEM YALÇINDAĞ,**** **** **** 2165,2026-02-20 07:29:15,2026-02-20 07:29:19,726
+10,3,Ankara,Gaziantep,2026-02-23,31500,TRY,paid,ADEM YALÇINDAĞ,**** **** **** 6843,2026-02-23 08:01:46,2026-02-23 08:01:55,750
+11,3,Amasya,Sakarya,2026-02-25,21000,TRY,paid,SADDADSA,**** **** **** 1111,2026-02-25 07:03:22,2026-02-25 07:03:30,500

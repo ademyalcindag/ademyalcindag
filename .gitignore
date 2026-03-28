@@ -31,3 +31,8 @@ yarn-error.log*
 # Upload artifacts (optional runtime files)
 uploads/*
 !uploads/.gitkeep
+
+# Large export files
+ademyalcindag-all-files-*.tar.gz
+ademyalcindag-all-files-*.zip
+ademyalcindag-portable-*.zip

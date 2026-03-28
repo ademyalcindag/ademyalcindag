@@ -36,3 +36,4 @@ uploads/*
 ademyalcindag-all-files-*.tar.gz
 ademyalcindag-all-files-*.zip
 ademyalcindag-portable-*.zip
+.vercel

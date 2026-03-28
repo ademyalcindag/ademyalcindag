@@ -52,6 +52,11 @@ if (allowedOrigins.length === 0) {
 app.use(express.json())
 app.use('/uploads', express.static(uploadDir))
 
+// Serve static files from dist directory (production build)
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir))
+}
+
 // Constants
 const JWT_SECRET = process.env.JWT_SECRET || 'tasimacilik-rehberi-secret-key-2026'
 const JWT_EXPIRES = '7d'
@@ -941,6 +946,18 @@ if (fs.existsSync(distDir)) {
     res.sendFile(path.join(distDir, 'index.html'))
   })
 }
+
+// ============ SPA FALLBACK ROUTING ============
+
+// Serve index.html for all non-API GET requests (SPA routing)
+app.get('*', (req, res) => {
+  const indexPath = path.join(distDir, 'index.html')
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath)
+  } else {
+    res.status(404).json({ success: false, error: 'Frontend not built' })
+  }
+})
 
 // ============ ERROR HANDLING ============
 

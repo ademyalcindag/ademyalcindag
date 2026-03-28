@@ -1,14 +1,20 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
   "framework": "node",
   "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist",
+        "buildCommand": "npm run build"
+      }
+    },
     {
       "src": "server/server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": "dist/**"
+        "includeFiles": "dist/**,uploads/**"
       }
     }
   ],
@@ -23,7 +29,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "server/server.js"
+      "dest": "/index.html"
     }
   ],
   "env": {

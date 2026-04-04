@@ -19,12 +19,9 @@ fi
 
 echo ""
 echo "📋 Next steps for Hostinger:"
-echo "1. GitHub deponuzdaki güncellemeleri kontrol edin"
-echo "2. Set Node.js version to 20+ in Hostinger panel"
 echo "1. GitHub deponuzdaki güncellemelerin tamamlandığından emin olun."
 echo "2. Hostinger panelinde Node.js versiyonunu 20+ olarak seçin."
 echo "3. Set startup file to: server/server.js"
 echo "4. Set application root to: /"
 echo "5. Enable PM2 process manager"
-echo "6. Siteniz tasimacilikrehberi.com adresinde yayında olacak!"
 echo "6. Siteniz artık tasimacilikrehberi.com adresinde yayında!"

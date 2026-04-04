@@ -3,6 +3,9 @@ echo "🚀 tasimacilikrehberi.com - Prodüksiyon Derlemesi Başlıyor"
 echo "================================"
 
 # Build the application
+echo "📦 Bağımlılıklar kontrol ediliyor..."
+npm install
+
 echo "📦 Frontend derleniyor..."
 npm run build
 

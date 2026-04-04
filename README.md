@@ -1,6 +1,6 @@
 # Taşımacılık Rehberi
 
-Web + mobil istemcisi olan, JWT kimlik doğrulama ve kalıcı veritabanı (SQLite dosyası) kullanan taşımacılık platformu.
+**tasimacilikrehberi.com** - Web + mobil istemcisi olan, JWT kimlik doğrulama ve kalıcı veritabanı (SQLite) kullanan profesyonel taşımacılık platformu.
 
 ## Özellikler
 
@@ -95,7 +95,7 @@ Bu komut otomatik olarak build yapar ve Hostinger için hazırlar.
 ### Site URL
 
 Yayınlandıktan sonra siteniz şu adreste olacak:
-`https://your-domain.hostinger.com`
+`https://tasimacilikrehberi.com`
 
 ### Sorun Giderme
 

@@ -1,26 +1,30 @@
 #!/bin/bash
-echo "🚀 Hostinger Deployment Script"
+echo "🚀 tasimacilikrehberi.com - Prodüksiyon Derlemesi Başlıyor"
 echo "================================"
 
 # Build the application
-echo "📦 Building application..."
+echo "📦 Frontend derleniyor..."
 npm run build
 
 # Check if build was successful
 if [ $? -eq 0 ]; then
-    echo "✅ Build successful!"
-    echo "📁 Build output in dist/ directory"
-    echo "🌐 Ready for deployment to Hostinger"
+    echo "✅ Derleme başarılı!"
+    echo "📁 'dist' klasörü oluşturuldu."
+    echo "📦 Node modülleri prodüksiyon için optimize ediliyor..."
+    npm install --production
 else
-    echo "❌ Build failed!"
+    echo "❌ Derleme hatası!"
     exit 1
 fi
 
 echo ""
 echo "📋 Next steps for Hostinger:"
-echo "1. Upload all files to your Hostinger hosting"
-echo "2. Set Node.js version to 18+ in Hostinger panel"
+echo "1. GitHub deponuzdaki güncellemeleri kontrol edin"
+echo "2. Set Node.js version to 20+ in Hostinger panel"
+echo "1. GitHub deponuzdaki güncellemelerin tamamlandığından emin olun."
+echo "2. Hostinger panelinde Node.js versiyonunu 20+ olarak seçin."
 echo "3. Set startup file to: server/server.js"
 echo "4. Set application root to: /"
 echo "5. Enable PM2 process manager"
-echo "6. Your site will be live!"
+echo "6. Siteniz tasimacilikrehberi.com adresinde yayında olacak!"
+echo "6. Siteniz artık tasimacilikrehberi.com adresinde yayında!"

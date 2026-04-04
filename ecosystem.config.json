@@ -7,10 +7,9 @@
   "max_memory_restart": "1G",
   "env": {
     "NODE_ENV": "production",
-    "PORT": 3001
+    "JWT_SECRET": "tasimacilik-rehberi-prod-secret-2026"
   },
   "env_production": {
-    "NODE_ENV": "production",
-    "PORT": 3001
+    "NODE_ENV": "production"
   }
 }

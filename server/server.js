@@ -3,7 +3,7 @@
  * JWT Authentication + SQLite Database
  * Kurulum: npm install (tüm dependencies zaten var)
  * Çalıştırma: node server/index.js
- * Port: 3001 (eski: 4000)
+ * Port: process.env.PORT (Hostinger uyumlu)
  */
 
 import express from 'express'
@@ -972,36 +972,21 @@ app.use((err,req,res,next)=>{
 
 // ============ SERVER START ============
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3001;
 
-async function start(){
+async function startServer() {
   try {
-    await initDb()
-    app.listen(PORT, ()=>{
-      console.log(`
-╔════════════════════════════════════════╗
-║   Taşımacılık Rehberi Backend         ║
-║   Production Mode with JWT Auth      ║
-╚════════════════════════════════════════╝
-✅ Server running on http://localhost:${PORT}
-📨 API: http://localhost:${PORT}/api
-🔐 JWT Token Authentication: Enabled
-💾 Database: SQLite with bcrypt hashing
-🗄️ DB Path: ${DB_PATH}
-📦 Multer: File Upload Ready
-🌐 Frontend: ${fs.existsSync(distDir) ? 'Serving dist/ from backend' : 'Not built yet (run npm run build:prod)'}
-
-Demo Credentials:
-📧 Firma: metro@tasima.com / Tax: 1234567890 / Pass: password123
-📧 Firma: anadolu@nakliyat.com / Tax: 9876543210 / Pass: password123
-      `)
-    })
+    await initDb();
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server is running on port ${PORT}`);
+      console.log(`🌍 Production URL: https://tasimacilikrehberi.com`);
+    });
   } catch (error) {
-    console.error('Failed to start server:', error)
-    process.exit(1)
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
 }
 
-start()
+startServer();
 
 export default app

@@ -237,8 +237,15 @@ export default function Auth(){
               <button type="button" className="btn" style={{flex:1}} onClick={()=>{setMode('account-type'); setAccountType(null)}}>Geri</button>
             </div>
             <div style={{textAlign:'center', marginTop:'16px', color:'#6b7280', fontSize:'13px'}}>Veya sosyal hesapla kayıt olun:</div>
-            <div className="socials">
-              <button type="button" className="btn" style={{background:'#4285F4', color:'white', border:'none', fontSize:'13px'}} onClick={()=>handleSocialLogin('google')}>🔵 Google</button>
+            <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => alert('Google Kayıt Başarısız')}
+                theme="filled_blue"
+                text="signup_with"
+                shape="rectangular"
+                size="medium"
+              />
               <button type="button" className="btn" style={{background:'#1877F2', color:'white', border:'none', fontSize:'13px'}} onClick={()=>handleSocialLogin('facebook')}>🔵 Facebook</button>
             </div>
           </form>
@@ -260,8 +267,15 @@ export default function Auth(){
               <button type="button" className="btn" style={{flex:1}} onClick={()=>{setMode('account-type'); setAccountType(null)}}>Geri</button>
             </div>
             <div style={{textAlign:'center', marginTop:'16px', color:'#6b7280', fontSize:'13px'}}>Veya sosyal hesapla kayıt olun:</div>
-            <div className="socials">
-              <button type="button" className="btn" style={{background:'#4285F4', color:'white', border:'none', fontSize:'13px'}} onClick={()=>handleSocialLogin('google')}>🔵 Google</button>
+            <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => alert('Google Kayıt Başarısız')}
+                theme="filled_blue"
+                text="signup_with"
+                shape="rectangular"
+                size="medium"
+              />
               <button type="button" className="btn" style={{background:'#1877F2', color:'white', border:'none', fontSize:'13px'}} onClick={()=>handleSocialLogin('facebook')}>🔵 Facebook</button>
             </div>
           </form>

@@ -35,7 +35,6 @@ export default function Auth(){
     if(loginType === 'user'){
       const res = await API.login(identifier, password)
       if(res.ok) {
-        alert('Giriş başarılı!')
         localStorage.setItem('userAuth', JSON.stringify(res.user))
         if (res.token) localStorage.setItem('authToken', res.token)
         navigate('/')
@@ -44,7 +43,6 @@ export default function Auth(){
       // Firma login: email/taxNumber ile doğrula
       const res = await API.loginCompany(identifier, taxNumber)
       if(res.ok) {
-        alert('Giriş başarılı!')
         localStorage.setItem('companyAuth', JSON.stringify(res.user))
         if (res.token) localStorage.setItem('authToken', res.token)
         navigate('/company/dashboard')
@@ -111,19 +109,17 @@ export default function Auth(){
       if(res.ok) {
         localStorage.setItem('userAuth', JSON.stringify(res.user));
         if (res.token) localStorage.setItem('authToken', res.token);
-        alert('Google ile giriş başarılı!');
         navigate('/');
       } else {
-        alert(res.error || 'Google girişi başarısız oldu.');
+        console.error(res.error || 'Google girişi başarısız oldu.');
       }
     } catch (error) {
       console.error("Google Auth Error:", error);
-      alert("Sunucu bağlantı hatası.");
     }
   }
 
   function handleSocialLogin(provider){
-    alert(`${provider.toUpperCase()} simülasyonu artık Google için devre dışı, gerçek akış kullanılıyor.`);
+    // Simülasyon yazısı kaldırıldı, artık sessiz çalışıyor.
   }
 
   return (
@@ -139,7 +135,7 @@ export default function Auth(){
 
             {!loginType ? (
               <div>
-                <h3 style={{marginTop:0, color:'var(--primary)', textAlign:'center'}}>Giriş türünü seçin (GERÇEK MOD)</h3>
+                <h3 style={{marginTop:0, color:'var(--primary)', textAlign:'center'}}>Giriş türünü seçin</h3>
                 <div style={{display:'flex', flexDirection:'column', gap:'12px', marginTop:'20px'}}>
                   <button 
                     type="button" 
@@ -173,7 +169,7 @@ export default function Auth(){
                     <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                       <GoogleLogin
                         onSuccess={handleGoogleSuccess}
-                        onError={() => alert('Google Login Başarısız')}
+                        onError={() => console.error('Google Login Başarısız')}
                         useOneTap
                         theme="filled_blue"
                         text="signin_with"
@@ -240,7 +236,7 @@ export default function Auth(){
             <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
-                onError={() => alert('Google Kayıt Başarısız')}
+                onError={() => console.error('Google Kayıt Başarısız')}
                 theme="filled_blue"
                 text="signup_with"
                 shape="rectangular"
@@ -270,7 +266,7 @@ export default function Auth(){
             <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
-                onError={() => alert('Google Kayıt Başarısız')}
+                onError={() => console.error('Google Kayıt Başarısız')}
                 theme="filled_blue"
                 text="signup_with"
                 shape="rectangular"

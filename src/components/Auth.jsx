@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
+import { jwtDecode } from 'jwt-decode' // opsiyonel: token içeriğini görmek için
 import { API } from '../data'
+
+// Google Cloud Console'dan aldığınız Client ID buraya gelecek
+const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com"
 
 export default function Auth(){
   const navigate = useNavigate()
@@ -96,20 +101,34 @@ export default function Auth(){
     }
   }
 
+  async function handleGoogleSuccess(credentialResponse) {
+    const idToken = credentialResponse.credential;
+    
+    // 1. Backend'e doğrulama için gönder (API.js'de bu metodun olduğunu varsayıyoruz)
+    // Eğer API.js henüz güncellenmediyse backend endpoint'ine direkt fetch atılabilir
+    try {
+      const res = await API.loginWithGoogle(idToken);
+      if(res.ok) {
+        localStorage.setItem('userAuth', JSON.stringify(res.user));
+        if (res.token) localStorage.setItem('authToken', res.token);
+        alert('Google ile giriş başarılı!');
+        navigate('/');
+      } else {
+        alert(res.error || 'Google girişi başarısız oldu.');
+      }
+    } catch (error) {
+      console.error("Google Auth Error:", error);
+      alert("Sunucu bağlantı hatası.");
+    }
+  }
+
   function handleSocialLogin(provider){
-    alert(`${provider.toUpperCase()} ile kayıt simülasyonu başlatılıyor...`)
-    localStorage.setItem(`socialAuth_${provider}`, JSON.stringify({
-      id: Math.random().toString(36),
-      name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
-      email: `user@${provider}.com`
-    }))
-    alert('Sosyal hesapla başarıyla bağlandı!')
-    localStorage.setItem('userAuth', JSON.stringify({id: Math.random(), name: `${provider} User`}))
-    navigate('/')
+    alert(`${provider.toUpperCase()} simülasyonu artık Google için devre dışı, gerçek akış kullanılıyor.`);
   }
 
   return (
-    <div className="container auth">
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <div className="container auth">
       <div className="auth-box">
         {mode === 'login' && (
           <>
@@ -151,8 +170,15 @@ export default function Auth(){
                       <button className="btn primary" type="submit">Giriş Yap</button>
                     </form>
                     <div style={{textAlign:'center', marginTop:'16px', color:'#6b7280', fontSize:'14px'}}>Veya sosyal hesapla giriş yapın:</div>
-                    <div className="socials">
-                      <button type="button" className="btn" style={{background:'#4285F4', color:'white', border:'none'}} onClick={()=>handleSocialLogin('google')}>🔵 Google ile Giriş</button>
+                    <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => alert('Google Login Başarısız')}
+                        useOneTap
+                        theme="filled_blue"
+                        text="signin_with"
+                        shape="rectangular"
+                      />
                       <button type="button" className="btn" style={{background:'#1877F2', color:'white', border:'none'}} onClick={()=>handleSocialLogin('facebook')}>🔵 Facebook ile Giriş</button>
                     </div>
                     <button type="button" className="btn" style={{marginTop:'12px', width:'100%'}} onClick={()=>setLoginType(null)}>Geri</button>
@@ -243,5 +269,6 @@ export default function Auth(){
 
       </div>
     </div>
+    </GoogleOAuthProvider>
   )
 }

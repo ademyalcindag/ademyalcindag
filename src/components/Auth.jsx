@@ -139,7 +139,7 @@ export default function Auth(){
 
             {!loginType ? (
               <div>
-                <h3 style={{marginTop:0, color:'var(--primary)', textAlign:'center'}}>Giriş türünü seçin</h3>
+                <h3 style={{marginTop:0, color:'var(--primary)', textAlign:'center'}}>Giriş türünü seçin (GERÇEK MOD)</h3>
                 <div style={{display:'flex', flexDirection:'column', gap:'12px', marginTop:'20px'}}>
                   <button 
                     type="button" 

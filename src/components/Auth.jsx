@@ -102,29 +102,24 @@ export default function Auth(){
   async function handleGoogleSuccess(credentialResponse) {
     const idToken = credentialResponse.credential;
     
-    // 1. Backend'e doğrulama için gönder (API.js'de bu metodun olduğunu varsayıyoruz)
-    // Eğer API.js henüz güncellenmediyse backend endpoint'ine direkt fetch atılabilir
     try {
       const res = await API.loginWithGoogle(idToken);
       if(res.ok) {
         localStorage.setItem('userAuth', JSON.stringify(res.user));
         if (res.token) localStorage.setItem('authToken', res.token);
         navigate('/');
-      } else {
-        console.error(res.error || 'Google girişi başarısız oldu.');
       }
     } catch (error) {
       console.error("Google Auth Error:", error);
     }
   }
 
-  function handleSocialLogin(provider){
-    // Simülasyon yazısı kaldırıldı, artık sessiz çalışıyor.
-  }
-
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <div className="container auth">
+      {/* Bu div yeni kodun yüklendiğini teyit etmen için eklendi */}
+      <div style={{position:'fixed', top:0, left:0, background:'#450ef3', color:'white', padding:'4px 8px', fontSize:'10px', zIndex:9999}}>CANLI SİSTEM V2</div>
+      
       <div className="auth-box">
         {mode === 'login' && (
           <>
@@ -175,7 +170,6 @@ export default function Auth(){
                         text="signin_with"
                         shape="rectangular"
                       />
-                      <button type="button" className="btn" style={{background:'#1877F2', color:'white', border:'none'}} onClick={()=>handleSocialLogin('facebook')}>🔵 Facebook ile Giriş</button>
                     </div>
                     <button type="button" className="btn" style={{marginTop:'12px', width:'100%'}} onClick={()=>setLoginType(null)}>Geri</button>
                   </div>
@@ -242,7 +236,6 @@ export default function Auth(){
                 shape="rectangular"
                 size="medium"
               />
-              <button type="button" className="btn" style={{background:'#1877F2', color:'white', border:'none', fontSize:'13px'}} onClick={()=>handleSocialLogin('facebook')}>🔵 Facebook</button>
             </div>
           </form>
         )}
@@ -272,7 +265,6 @@ export default function Auth(){
                 shape="rectangular"
                 size="medium"
               />
-              <button type="button" className="btn" style={{background:'#1877F2', color:'white', border:'none', fontSize:'13px'}} onClick={()=>handleSocialLogin('facebook')}>🔵 Facebook</button>
             </div>
           </form>
         )}

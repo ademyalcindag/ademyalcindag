@@ -35,7 +35,7 @@ export default function CompanyDashboard(){
   const handleLogout = () => {
     localStorage.removeItem('companyAuth')
     localStorage.removeItem('authToken')
-    navigate('/auth')
+    window.location.href = '/' // Tam temizlik ve yönlendirme
   }
 
   const handleFirmUpdate = async (e) => {

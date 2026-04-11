@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API } from '../data'
 
@@ -10,6 +10,18 @@ export default function Auth(){
   const [password, setPassword] = useState('')
   const [identifier, setIdentifier] = useState('')
   const [taxNumber, setTaxNumber] = useState('')
+
+  // Eğer zaten giriş yapılmışsa kullanıcıyı yetkisine göre uygun yere yönlendir
+  useEffect(() => {
+    const user = localStorage.getItem('userAuth')
+    const company = localStorage.getItem('companyAuth')
+    
+    if (user) {
+      navigate('/')
+    } else if (company) {
+      navigate('/company/dashboard')
+    }
+  }, [navigate])
 
   async function handleLogin(e){
     e.preventDefault()

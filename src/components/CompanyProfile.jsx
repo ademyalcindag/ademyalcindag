@@ -6,6 +6,7 @@ export default function CompanyProfile(){
   const { id } = useParams()
   const [firm, setFirm] = useState(null)
   const [messageOpen, setMessageOpen] = useState(false)
+  const [messageText, setMessageText] = useState('')
 
   useEffect(()=>{
     API.fetchFirm(id).then(setFirm)
@@ -40,11 +41,15 @@ export default function CompanyProfile(){
         <div className="modal">
           <div className="modal-body">
             <h4>{firm.name} — Mesaj Gönder</h4>
-            <textarea id="msgText" placeholder="Mesajınızı yazın..."></textarea>
+            <textarea 
+              value={messageText} 
+              onChange={(e) => setMessageText(e.target.value)} 
+              placeholder="Mesajınızı yazın..."
+            ></textarea>
             <div className="modal-actions">
               <button className="btn" onClick={()=>setMessageOpen(false)}>İptal</button>
               <button className="btn primary" onClick={async ()=>{
-                const content = document.getElementById('msgText').value
+                const content = messageText
                 const auth = JSON.parse(localStorage.getItem('userAuth') || 'null')
                 const result = await API.sendMessage({
                   firmId: firm.id,
@@ -59,6 +64,7 @@ export default function CompanyProfile(){
                 }
                 alert('Mesaj gönderildi')
                 setMessageOpen(false)
+                setMessageText('')
               }}>Gönder</button>
             </div>
           </div>

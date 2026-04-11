@@ -160,66 +160,8 @@ async function initDb() {
     )
   `)
 
-  // Seed data if empty
-  const count = await db.get('SELECT COUNT(*) as cnt FROM firms')
-  if (count.cnt === 0) {
-    const pwd = await bcrypt.hash('password123', 10)
-    const userPwd = await bcrypt.hash('user123', 10)
-
-    await db.run(
-      `INSERT INTO firms (name, email, taxNumber, city, address, phone, loadStatus, price, distanceKm, rating, password, description) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['Metro Taşıma', 'metro@tasima.com', '1234567890', 'İstanbul', 'Kadıköy Mah. 15', '+90 532 000 0000', 'Boş', 2500, 400, 4.5, pwd, 'En güvenilir taşıma hizmeti']
-    )
-
-    await db.run(
-      `INSERT INTO firms (name, email, taxNumber, city, address, phone, loadStatus, price, distanceKm, rating, password, description) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['Anadolu Nakliyat', 'anadolu@nakliyat.com', '9876543210', 'Ankara', 'Çankaya Cad. 7', '+90 532 111 1111', 'Dolu', 3200, 250, 4.2, pwd, 'Profesyonel taşıma ve depolama hizmetleri']
-    )
-
-    await db.run(
-      `INSERT INTO users (name, email, phone, password, type) 
-       VALUES (?, ?, ?, ?, ?)`,
-      ['Test User', 'user@example.com', '+90 500 123 4567', userPwd, 'user']
-    )
-
-    const f1 = await db.get('SELECT id FROM firms WHERE name = ?', 'Metro Taşıma')
-    const f2 = await db.get('SELECT id FROM firms WHERE name = ?', 'Anadolu Nakliyat')
-
-    await db.run(
-      `INSERT INTO campaigns (firmId, title, description, discount, startDate, endDate) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [f1.id, 'Yaz İndirimi %10', 'Haziran-Temmuz taşımalarda %10 indirim.', 10, '2025-06-01', '2025-07-31']
-    )
-
-    await db.run(
-      `INSERT INTO campaigns (firmId, title, description, discount, startDate, endDate) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [f2.id, 'Hafta Sonu Kampanyası', 'Cumartesi taşımalarda ekstra ekip.', 15, '2025-01-01', '2025-12-31']
-    )
-
-    await db.run(
-      `INSERT INTO prices (firmId, fromCity, toCity, price, estimatedHours) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [f1.id, 'İstanbul', 'Ankara', 2500, 12]
-    )
-    await db.run(
-      `INSERT INTO prices (firmId, fromCity, toCity, price, estimatedHours) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [f1.id, 'İstanbul', 'İzmir', 1800, 8]
-    )
-    await db.run(
-      `INSERT INTO prices (firmId, fromCity, toCity, price, estimatedHours) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [f2.id, 'Ankara', 'İstanbul', 2500, 12]
-    )
-    await db.run(
-      `INSERT INTO prices (firmId, fromCity, toCity, price, estimatedHours) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [f2.id, 'Ankara', 'Gaziantep', 3000, 14]
-    )
-  }
+  // Demo verileri temizle
+  await db.run("DELETE FROM firms WHERE name IN ('Metro Taşıma', 'Anadolu Nakliyat')")
 }
 
 // ===== Public Routes =====

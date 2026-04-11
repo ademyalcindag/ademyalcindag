@@ -230,33 +230,8 @@ async function initDb(){
     await db.exec('CREATE INDEX IF NOT EXISTS idx_prices_firmId ON prices(firmId)')
   }
 
-  // Seed data
-  const count = await db.get('SELECT COUNT(*) as c FROM firms')
-  if(count.c === 0){
-    const hashedPassword1 = await hashPassword('password123')
-    const hashedPassword2 = await hashPassword('password123')
-    
-    const r1 = await db.run(
-      `INSERT INTO firms (name,email,taxNumber,city,district,toCity,toDistrict,phone,loadStatus,price,pricePerKm,rating,password,description)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      ['Metro Taşıma','metro@tasima.com','1234567890','İstanbul','Kadıköy','Ankara','Çankaya','+90 532 000 0000','Boş',2500,50,4.5,hashedPassword1,'Hızlı ve güvenilir taşımacılık hizmeti']
-    )
-    
-    const r2 = await db.run(
-      `INSERT INTO firms (name,email,taxNumber,city,district,toCity,toDistrict,phone,loadStatus,price,pricePerKm,rating,password,description)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      ['Anadolu Nakliyat','anadolu@nakliyat.com','9876543210','Ankara','Çankaya','İstanbul','Kadıköy','+90 532 111 1111','Dolu',3200,55,4.2,hashedPassword2,'Anadolu bölgesinde uzman taşımacılık']
-    )
-
-    // Add sample prices
-    const firm1 = r1.lastID
-    const firm2 = r2.lastID
-    
-    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price) VALUES (?,?,?,?)', [firm1,'İstanbul','Ankara',2500])
-    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price) VALUES (?,?,?,?)', [firm1,'İstanbul','İzmir',1800])
-    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price) VALUES (?,?,?,?)', [firm2,'Ankara','İstanbul',2500])
-    await db.run('INSERT INTO prices (firmId,fromCity,toCity,price) VALUES (?,?,?,?)', [firm2,'Ankara','Gaziantep',3000])
-  }
+  // Demo hesapları temizle
+  await db.run("DELETE FROM firms WHERE name IN ('Metro Taşıma', 'Anadolu Nakliyat')")
   
   console.log('✅ Database initialized')
 }
@@ -301,7 +276,7 @@ function authMiddleware(req, res, next) {
 // ============ USER ENDPOINTS ============
 
 // User Registration
-app.post('/api/register', async (req,res)=>{
+app.post('/api/register-user', async (req,res)=>{
   try {
     const { name, email, phone, password, confirmPassword } = req.body
 
@@ -339,6 +314,7 @@ app.post('/api/register', async (req,res)=>{
 
     res.status(201).json({
       success: true,
+      ok: true,
       message: 'Kayıt başarılı',
       user,
       token
@@ -404,7 +380,7 @@ app.post('/api/login', async (req,res)=>{
 // ============ FIRM ENDPOINTS ============
 
 // Firm Registration
-app.post('/api/register-firm', async (req,res)=>{
+app.post('/api/register-company', async (req,res)=>{
   try {
     const {
       name, email, phone, taxNumber, city, district,
@@ -455,6 +431,7 @@ app.post('/api/register-firm', async (req,res)=>{
 
     res.status(201).json({
       success: true,
+      ok: true,
       message: 'Firma kayıt başarılı',
       user: firm,
       token

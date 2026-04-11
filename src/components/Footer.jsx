@@ -25,6 +25,8 @@ export default function Footer() {
     }, 3000)
   }
 
+  const isAuth = localStorage.getItem('userAuth') || localStorage.getItem('companyAuth')
+
   return (
     <>
       <footer className="site-footer">
@@ -49,7 +51,7 @@ export default function Footer() {
             <nav className="footer-links" aria-label="Hızlı erişim">
               <Link to="/">Ana Sayfa</Link>
               <Link to="/campaigns">Kampanyalar</Link>
-              <Link to="/auth">Giriş / Kayıt</Link>
+              {!isAuth && <Link to="/auth">Giriş / Kayıt</Link>}
             </nav>
           </section>
 
@@ -65,9 +67,9 @@ export default function Footer() {
           <section className="footer-column">
             <h4>Yasal</h4>
             <div className="footer-links" aria-label="Yasal bağlantılar">
-              <a href="#" onClick={(event) => { event.preventDefault(); alert('KVKK Aydinlatma Metni yakinda eklenecek') }}>KVKK</a>
-              <a href="#" onClick={(event) => { event.preventDefault(); alert('Kullanim Sartlari yakinda eklenecek') }}>Şartlar</a>
-              <a href="#" onClick={(event) => { event.preventDefault(); alert('Gizlilik Politikasi yakinda eklenecek') }}>Gizlilik</a>
+              <Link to="/kvkk">KVKK</Link>
+              <Link to="/terms">Şartlar</Link>
+              <Link to="/privacy">Gizlilik</Link>
             </div>
           </section>
         </div>

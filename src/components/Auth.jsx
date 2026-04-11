@@ -5,7 +5,7 @@ import { jwtDecode } from 'jwt-decode' // opsiyonel: token içeriğini görmek i
 import { API } from '../data'
 
 // Google Cloud Console'dan aldığınız Client ID buraya gelecek
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com"
+const GOOGLE_CLIENT_ID = "703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com"
 
 export default function Auth(){
   const navigate = useNavigate()

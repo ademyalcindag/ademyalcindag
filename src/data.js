@@ -241,8 +241,17 @@ export const API = {
     return parsed.ok ? { ok: true, message: parsed.raw?.message } : { ok: false, error: parsed.error }
   },
 
-  async loginGoogle(profile) {
-    return { ok: true, user: profile }
+  async loginWithGoogle(idToken) {
+    const res = await fetch(buildUrl('/api/login-google'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify({ idToken }),
+    })
+    const parsed = await parseJsonResponse(res)
+
+    return parsed.ok
+      ? { ok: true, user: parsed.raw?.user, token: parsed.raw?.token }
+      : { ok: false, error: parsed.error }
   },
 
   async loginFacebook(profile) {
@@ -254,4 +263,3 @@ export const API = {
     return { ok: true, user: pseudoUser }
   },
 }
-

@@ -108,9 +108,12 @@ export default function Auth(){
         localStorage.setItem('userAuth', JSON.stringify(res.user));
         if (res.token) localStorage.setItem('authToken', res.token);
         navigate('/');
+      } else {
+        alert("Google Giriş Hatası: " + (res.error || "Sunucuya ulaşılamadı."));
       }
     } catch (error) {
       console.error("Google Auth Error:", error);
+      alert("Google bağlantısı sırasında bir teknik hata oluştu.");
     }
   }
 

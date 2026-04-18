@@ -119,9 +119,6 @@ export default function Auth(){
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <div className="container auth">
-      {/* Bu div yeni kodun yüklendiğini teyit etmen için eklendi */}
-      <div style={{position:'fixed', top:0, left:0, background:'#450ef3', color:'white', padding:'4px 8px', fontSize:'10px', zIndex:9999}}>CANLI SİSTEM V2</div>
-      
       <div className="auth-box">
         {mode === 'login' && (
           <>

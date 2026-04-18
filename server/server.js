@@ -29,26 +29,60 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir)
 const upload = multer({ dest: uploadDir })
 const app = express()
 
-// Middleware
-const allowedOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean)
+// CORS Configuration
+let corsOptions = {}
 
-if (allowedOrigins.length === 0) {
-  app.use(cors())
+if (process.env.NODE_ENV === 'development') {
+  // Development: Tüm origins'e izin ver
+  corsOptions = {
+    origin: '*',
+    credentials: false
+  }
 } else {
-  app.use(cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true)
-        return
-      }
+  // Production: Sadece izin verilen origins'e izin ver
+  const allowedOrigins = (process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
 
-      callback(new Error('Not allowed by CORS'))
-    },
-  }))
+  if (allowedOrigins.length === 0) {
+    // Eğer CORS_ORIGINS set edilmemişse herkese izin ver (güvensiz, ama production'da uyarı ver)
+    console.warn('⚠️  CORS_ORIGINS set edilmedi! Tüm origins\'e izin veriliyor.')
+    corsOptions = {
+      origin: '*',
+      credentials: false
+    }
+  } else {
+    corsOptions = {
+      origin(origin, callback) {
+        // Origin olmayan (mobile, curl) isteklere izin ver
+        if (!origin) {
+          callback(null, true)
+          return
+        }
+        
+        // Exact match kontrol et
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true)
+          return
+        }
+        
+        // www. ile olmayan var mı kontrol et
+        const withoutWWW = origin.replace('://www.', '://')
+        if (allowedOrigins.some(o => o.replace('://www.', '://') === withoutWWW)) {
+          callback(null, true)
+          return
+        }
+
+        callback(new Error(`CORS blocked: ${origin}`))
+      },
+      credentials: true
+    }
+  }
 }
+
+console.log('🔐 CORS Configuration:', process.env.NODE_ENV, corsOptions)
+app.use(cors(corsOptions))
 
 app.use(express.json())
 app.use('/uploads', express.static(uploadDir))
@@ -497,11 +531,15 @@ app.post('/api/login-company', async (req,res)=>{
 app.post('/api/login-google', async (req, res) => {
   try {
     const { idToken } = req.body
+    console.log('📱 Google Login Request - Token uzunluğu:', idToken?.length)
+    
     if (!idToken) {
       return res.status(400).json({ success: false, error: 'ID token gerekli' })
     }
 
     // Google ID token'ı doğrula
+    console.log('🔐 Google Client ID:', GOOGLE_CLIENT_ID?.substring(0, 20) + '...')
+    
     const ticket = await googleClient.verifyIdToken({
       idToken: idToken,
       audience: GOOGLE_CLIENT_ID,
@@ -509,6 +547,7 @@ app.post('/api/login-google', async (req, res) => {
 
     const payload = ticket.getPayload()
     const { email, name, picture } = payload
+    console.log('✅ Google token doğrulandı. Email:', email)
 
     if (!email) {
       return res.status(400).json({ success: false, error: 'Email adresine ulaşılamadı' })

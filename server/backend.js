@@ -9,10 +9,13 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import validator from 'validator'
 import dotenv from 'dotenv'
+import { OAuth2Client } from 'google-auth-library'
 
 dotenv.config()
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key'
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com'
+const client = new OAuth2Client(GOOGLE_CLIENT_ID)
 const __dirname = path.resolve()
 const uploadDir = path.join(__dirname, 'uploads')
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir)
@@ -159,6 +162,16 @@ async function initDb() {
       FOREIGN KEY (firmId) REFERENCES firms(id) ON DELETE CASCADE
     )
   `)
+
+  // Add picture column to users table if it doesn't exist
+  try {
+    await db.run('ALTER TABLE users ADD COLUMN picture TEXT')
+  } catch (e) {
+    // Sütun zaten varsa veya başka hata
+    if (!e.message.includes('duplicate column')) {
+      console.error('Warning: Could not add picture column:', e.message)
+    }
+  }
 
   // Demo verileri temizle
   await db.run("DELETE FROM firms WHERE name IN ('Metro Taşıma', 'Anadolu Nakliyat')")
@@ -324,6 +337,63 @@ app.post('/api/login-company', async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
+
+// ===== Google OAuth Login =====
+
+app.post('/api/login-google', async (req, res) => {
+  try {
+    const { idToken } = req.body
+    if (!idToken) return res.status(400).json({ error: 'ID token gerekli' })
+
+    // Google ID token'ı doğrula
+    const ticket = await client.verifyIdToken({
+      idToken: idToken,
+      audience: GOOGLE_CLIENT_ID,
+    })
+
+    const payload = ticket.getPayload()
+    const { email, name, picture } = payload
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email adresine ulaşılamadı' })
+    }
+
+    // Mevcut kullanıcıyı kontrol et
+    let user = await db.get('SELECT * FROM users WHERE email = ?', email)
+
+    if (user) {
+      // Kullanıcı zaten var, giriş yap
+      const token = jwt.sign({ userId: user.id, type: 'user' }, JWT_SECRET, { expiresIn: '7d' })
+      return res.json({
+        ok: true,
+        token,
+        user: { id: user.id, name: user.name, email: user.email, type: user.type, picture: user.picture },
+      })
+    }
+
+    // Yeni kullanıcı oluştur - Google ile kayıt
+    // Rastgele şifre oluştur (Google hesabı kullanılacağı için güvenlik sorunu yok)
+    const randomPassword = await bcrypt.hash(Math.random().toString(36).substring(7), 10)
+
+    const stmt = await db.run(
+      'INSERT INTO users (name, email, password, type) VALUES (?, ?, ?, ?)',
+      [name || 'Google User', email, randomPassword, 'user']
+    )
+
+    const newUser = await db.get('SELECT id, name, email, type FROM users WHERE id = ?', stmt.lastID)
+    const token = jwt.sign({ userId: newUser.id, type: 'user' }, JWT_SECRET, { expiresIn: '7d' })
+
+    res.json({
+      ok: true,
+      token,
+      user: { id: newUser.id, name: newUser.name, email: newUser.email, type: newUser.type, picture },
+    })
+  } catch (error) {
+    console.error('Google OAuth Error:', error)
+    res.status(500).json({ error: 'Google doğrulama başarısız: ' + error.message })
+  }
+})
+
 
 // ===== Messages & Bookings =====
 

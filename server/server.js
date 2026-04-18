@@ -16,6 +16,7 @@ import { open } from 'sqlite'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import { OAuth2Client } from 'google-auth-library'
 
 dotenv.config()
 
@@ -61,6 +62,8 @@ if (fs.existsSync(distDir)) {
 const JWT_SECRET = process.env.JWT_SECRET || 'tasimacilik-rehberi-secret-key-2026'
 const JWT_EXPIRES = '7d'
 const SALT_ROUNDS = 10
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com'
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID)
 
 let db
 
@@ -78,6 +81,7 @@ async function ensureColumn(tableName, columnName, definition) {
 
 async function runSchemaMigrations() {
   await ensureColumn('users', 'updatedAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP')
+  await ensureColumn('users', 'picture', 'TEXT')
 
   await ensureColumn('firms', 'district', 'TEXT')
   await ensureColumn('firms', 'toCity', 'TEXT')
@@ -486,6 +490,77 @@ app.post('/api/login-company', async (req,res)=>{
   } catch (error) {
     console.error('Firm login error:', error)
     res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+// Google OAuth Login/Register
+app.post('/api/login-google', async (req, res) => {
+  try {
+    const { idToken } = req.body
+    if (!idToken) {
+      return res.status(400).json({ success: false, error: 'ID token gerekli' })
+    }
+
+    // Google ID token'ı doğrula
+    const ticket = await googleClient.verifyIdToken({
+      idToken: idToken,
+      audience: GOOGLE_CLIENT_ID,
+    })
+
+    const payload = ticket.getPayload()
+    const { email, name, picture } = payload
+
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email adresine ulaşılamadı' })
+    }
+
+    // Mevcut kullanıcıyı kontrol et
+    let user = await db.get('SELECT * FROM users WHERE email = ?', [email])
+
+    if (user) {
+      // Kullanıcı zaten var, giriş yap
+      const token = generateToken({ id: user.id, email: user.email })
+      return res.json({
+        success: true,
+        message: 'Google ile giriş başarılı',
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          picture: user.picture || picture,
+        },
+        token,
+      })
+    }
+
+    // Yeni kullanıcı oluştur - Google ile kayıt
+    // Rastgele şifre oluştur (Google hesabı kullanılacağı için güvenlik sorunu yok)
+    const randomPassword = await bcrypt.hash(Math.random().toString(36).substring(7), SALT_ROUNDS)
+
+    const result = await db.run(
+      'INSERT INTO users (name, email, password, phone, picture) VALUES (?, ?, ?, ?, ?)',
+      [name || 'Google User', email, randomPassword, null, picture || null]
+    )
+
+    const newUser = await db.get('SELECT * FROM users WHERE id = ?', [result.lastID])
+    const token = generateToken({ id: newUser.id, email: newUser.email })
+
+    res.json({
+      success: true,
+      message: 'Google ile kayıt başarılı',
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        picture: newUser.picture || picture,
+      },
+      token,
+    })
+  } catch (error) {
+    console.error('Google OAuth Error:', error)
+    res.status(500).json({ success: false, error: 'Google doğrulama başarısız: ' + error.message })
   }
 })
 

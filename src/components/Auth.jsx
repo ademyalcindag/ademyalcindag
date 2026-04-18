@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
-import { jwtDecode } from 'jwt-decode' // opsiyonel: token içeriğini görmek için
 import { API } from '../data'
 
 // Google Cloud Console'dan aldığınız Client ID buraya gelecek
@@ -167,11 +166,14 @@ export default function Auth(){
                     <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                       <GoogleLogin
                         onSuccess={handleGoogleSuccess}
-                        onError={() => console.error('Google Login Başarısız')}
-                        useOneTap
+                        onError={() => {
+                          console.error('Google Login Başarısız')
+                          alert('Google bağlantısı sırasında hata oluştu. Lütfen tekrar deneyin.')
+                        }}
                         theme="filled_blue"
                         text="signin_with"
                         shape="rectangular"
+                        locale="tr"
                       />
                     </div>
                     <button type="button" className="btn" style={{marginTop:'12px', width:'100%'}} onClick={()=>setLoginType(null)}>Geri</button>
@@ -233,11 +235,15 @@ export default function Auth(){
             <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
-                onError={() => console.error('Google Kayıt Başarısız')}
+                onError={() => {
+                  console.error('Google Kayıt Başarısız')
+                  alert('Google bağlantısı sırasında hata oluştu. Lütfen tekrar deneyin.')
+                }}
                 theme="filled_blue"
                 text="signup_with"
                 shape="rectangular"
                 size="medium"
+                locale="tr"
               />
             </div>
           </form>
@@ -262,11 +268,15 @@ export default function Auth(){
             <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
-                onError={() => console.error('Google Kayıt Başarısız')}
+                onError={() => {
+                  console.error('Google Kayıt Başarısız')
+                  alert('Google bağlantısı sırasında hata oluştu. Lütfen tekrar deneyin.')
+                }}
                 theme="filled_blue"
                 text="signup_with"
                 shape="rectangular"
                 size="medium"
+                locale="tr"
               />
             </div>
           </form>

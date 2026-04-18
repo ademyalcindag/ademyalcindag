@@ -389,8 +389,26 @@ app.post('/api/login-google', async (req, res) => {
       user: { id: newUser.id, name: newUser.name, email: newUser.email, type: newUser.type, picture },
     })
   } catch (error) {
-    console.error('Google OAuth Error:', error)
-    res.status(500).json({ error: 'Google doğrulama başarısız: ' + error.message })
+    console.error('❌ Google OAuth Error:', {
+      message: error.message,
+      code: error.code,
+      status: error.status
+    })
+    
+    // Hata mesajlarını user-friendly yap
+    let errorMsg = 'Google doğrulama başarısız'
+    if (error.message?.includes('origin_mismatch')) {
+      errorMsg = 'Uygun olmayan origin. Google Cloud Console\'da domain\'ini kontrol et.'
+    } else if (error.message?.includes('invalid_client')) {
+      errorMsg = 'Geçersiz Google Client ID. Backend administrator\'e bildir.'
+    } else if (error.message?.includes('invalid_token')) {
+      errorMsg = 'Geçersiz token. Lütfen tekrar dene.'
+    }
+    
+    res.status(500).json({ 
+      error: errorMsg,
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
   }
 })
 

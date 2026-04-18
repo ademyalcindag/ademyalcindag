@@ -83,6 +83,8 @@ Bu komut otomatik olarak build yapar ve Hostinger için hazırlar.
    NODE_ENV=production
    PORT=3001
    JWT_SECRET=your-secret-key
+   GOOGLE_CLIENT_ID=your-google-client-id
+   CORS_ORIGINS=https://www.tasimacilikrehberi.com,https://tasimacilikrehberi.com
    ```
 
 ### Hostinger Yapılandırması
@@ -91,6 +93,7 @@ Bu komut otomatik olarak build yapar ve Hostinger için hazırlar.
 - **SPA Routing**: `dist/.htaccess` dosyası React Router için gerekli
 - **Database**: SQLite dosyası otomatik oluşturulur
 - **Static Files**: `dist/` klasöründen serve edilir
+- **Google OAuth**: [Kurulum Kılavuzu](docs/GOOGLE_OAUTH_SETUP.md)
 
 ### Site URL
 
@@ -99,7 +102,10 @@ Yayınlandıktan sonra siteniz şu adreste olacak:
 
 ### Sorun Giderme
 
-Eğer hata alırsanız:
+#### "Error 400: origin_mismatch"
+Google OAuth'ta bu hata alıyorsanız → [Google OAuth Setup](docs/GOOGLE_OAUTH_SETUP.md) kılavuzunu takip et
+
+#### Diğer Sorunlar
 1. Hostinger panelinde logs'u kontrol edin
 2. `npm run build` komutunu yerel olarak test edin
 3. Database dosyasının yazılabilir olduğundan emin olun

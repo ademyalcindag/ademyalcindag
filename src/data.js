@@ -51,7 +51,7 @@ export const API = {
 
   async register(payload) {
     const isCompany = payload?.type === 'company'
-    const endpoint = isCompany ? '/api/register-firm' : '/api/register'
+    const endpoint = isCompany ? '/api/register-company' : '/api/register-user'
     const baseBody = {
       ...payload,
       confirmPassword: payload?.confirmPassword || payload?.password,
@@ -76,6 +76,69 @@ export const API = {
       method: 'POST',
       headers: jsonHeaders(false),
       body: JSON.stringify(body),
+    })
+    const parsed = await parseJsonResponse(res)
+
+    return parsed.ok
+      ? { ok: true, user: parsed.raw?.user, token: parsed.raw?.token }
+      : { ok: false, error: parsed.error }
+  },
+
+  async startUserRegistration(payload) {
+    const body = {
+      ...payload,
+      confirmPassword: payload?.confirmPassword || payload?.password,
+    }
+
+    const res = await fetch(buildUrl('/api/register/start-user'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify(body),
+    })
+    const parsed = await parseJsonResponse(res)
+
+    return parsed.ok
+      ? {
+          ok: true,
+          pendingToken: parsed.raw?.pendingToken,
+          smsAvailable: Boolean(parsed.raw?.smsAvailable),
+          demoSmsCode: parsed.raw?.demoSmsCode,
+          expiresInMinutes: parsed.raw?.expiresInMinutes,
+        }
+      : { ok: false, error: parsed.error }
+  },
+
+  async resendRegistrationSms(pendingToken) {
+    const res = await fetch(buildUrl('/api/register/resend-sms'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify({ pendingToken }),
+    })
+    const parsed = await parseJsonResponse(res)
+
+    return parsed.ok
+      ? { ok: true, demoSmsCode: parsed.raw?.demoSmsCode, message: parsed.raw?.message }
+      : { ok: false, error: parsed.error }
+  },
+
+  async verifyUserRegistrationSms(payload) {
+    const res = await fetch(buildUrl('/api/register/verify-sms'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify(payload),
+    })
+    const parsed = await parseJsonResponse(res)
+
+    return parsed.ok
+      ? { ok: true, user: parsed.raw?.user, token: parsed.raw?.token }
+      : { ok: false, error: parsed.error }
+  },
+
+  async verifyUserRegistrationGoogle(pendingToken, idToken) {
+    const res = await fetch(buildUrl('/api/register/verify-google'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify({ pendingToken, idToken }),
     })
     const parsed = await parseJsonResponse(res)
 

@@ -29,14 +29,29 @@ Açılan modal'da **Authorized JavaScript origins** bölümünü bul.
 Production domain'ini ekle (2 satır olarak):
 
 ```
-https://www.tasimacilik-rehberi.com
-https://tasimacilik-rehberi.com
+https://www.tasimacilikrehberi.com
+https://tasimacilikrehberi.com
 ```
 
 ⚠️ **ÖNEMLİ:**
 - `http://` değil `https://` yaz
 - `www.` ile ve olmadan **İKİSİNİ** de ekle
 - Localhost ve production ayrı ayrı manage etmen gerekebilir
+
+### Step 3.1: `xn--...` görünmesini istemiyorsan
+
+Google hesabı seçim ekranında `xn--...` görünmesi, domain'in IDN/punycode olarak algılanmasından kaynaklanır.
+
+İstediğin görünüm için:
+
+1. Girişi ASCII domaine taşı (`tasimacilikrehberi.com` gibi, Türkçe karakter içermeyen host)
+2. `.env` içine canonical host ekle:
+
+```
+VITE_CANONICAL_HOST=www.tasimacilikrehberi.com
+```
+
+Bu projede frontend, `xn--` hosttan açılırsa otomatik olarak `VITE_CANONICAL_HOST` değerine yönlendirir.
 
 ### Step 4: Değişiklikleri Kaydet
 
@@ -76,7 +91,7 @@ Veya Hostinger panel'inde Node.js uygulamasını restart et.
 
 ## Test Etme
 
-1. Tarayıcıda siteni aç: https://www.tasimacilik-rehberi.com
+1. Tarayıcıda siteni aç: https://www.tasimacilikrehberi.com
 2. Auth sayfasına git
 3. "Kullanıcı Girişi" → "Google ile Giriş Yap" butonuna tıkla
 4. Google popup açılmalı

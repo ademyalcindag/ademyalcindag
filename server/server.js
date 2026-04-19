@@ -16,6 +16,7 @@ import { open } from 'sqlite'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import crypto from 'crypto'
 import { OAuth2Client } from 'google-auth-library'
 
 dotenv.config()
@@ -98,6 +99,12 @@ const JWT_EXPIRES = '7d'
 const SALT_ROUNDS = 10
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com'
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID)
+const REGISTER_OTP_EXPIRES_MINUTES = 10
+const SMS_PROVIDER = String(process.env.SMS_PROVIDER || 'mock').trim().toLowerCase()
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || ''
+const SMS_DEFAULT_COUNTRY_CODE = process.env.SMS_DEFAULT_COUNTRY_CODE || '+90'
 
 let db
 
@@ -253,6 +260,20 @@ async function initDb(){
       FOREIGN KEY(bookingId) REFERENCES booking_orders(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS pending_registrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT UNIQUE NOT NULL,
+      accountType TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      payload TEXT NOT NULL,
+      smsCode TEXT,
+      smsSentAt DATETIME,
+      expiresAt DATETIME NOT NULL,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
   `)
 
   await runSchemaMigrations()
@@ -295,6 +316,127 @@ function verifyToken(token) {
   }
 }
 
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase()
+}
+
+function createOtpCode() {
+  return String(Math.floor(100000 + Math.random() * 900000))
+}
+
+function createPendingToken() {
+  return crypto.randomUUID()
+}
+
+function expiresAtIso(minutes) {
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString()
+}
+
+function isExpired(isoDate) {
+  return !isoDate || Number.isNaN(Date.parse(isoDate)) || Date.parse(isoDate) < Date.now()
+}
+
+function normalizePhoneForSms(rawPhone) {
+  const cleaned = String(rawPhone || '').replace(/\s+/g, '')
+  if (!cleaned) return ''
+
+  if (cleaned.startsWith('+')) return cleaned
+  if (cleaned.startsWith('00')) return `+${cleaned.slice(2)}`
+
+  const digits = cleaned.replace(/\D/g, '')
+  if (!digits) return ''
+
+  if (digits.startsWith('90')) return `+${digits}`
+  if (digits.startsWith('0')) return `${SMS_DEFAULT_COUNTRY_CODE}${digits.slice(1)}`
+  return `${SMS_DEFAULT_COUNTRY_CODE}${digits}`
+}
+
+function isValidTurkeyPhone(phone) {
+  const value = String(phone || '').trim()
+  if (!value) return false
+
+  if (/^\+90\d{10}$/.test(value)) return true
+  if (/^0\d{10}$/.test(value)) return true
+  return false
+}
+
+async function sendVerificationSms(phone, code) {
+  const normalizedPhone = normalizePhoneForSms(phone)
+  if (!normalizedPhone) {
+    throw new Error('Telefon numarası doğrulama için uygun formatta değil')
+  }
+
+  const message = `Tasima Rehberi dogrulama kodunuz: ${code}`
+
+  if (SMS_PROVIDER === 'mock') {
+    console.log(`📩 [MOCK SMS] ${normalizedPhone}: ${message}`)
+    return { provider: 'mock', delivered: true }
+  }
+
+  if (SMS_PROVIDER === 'twilio') {
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
+      throw new Error('Twilio ayarlari eksik. TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN ve TWILIO_FROM_NUMBER gerekli')
+    }
+
+    const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
+    const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64')
+    const body = new URLSearchParams({
+      To: normalizedPhone,
+      From: TWILIO_FROM_NUMBER,
+      Body: message,
+    })
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        authorization: `Basic ${auth}`,
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    })
+
+    const json = await response.json().catch(() => null)
+    if (!response.ok) {
+      const detail = json?.message || json?.error_message || 'SMS gonderilemedi'
+      throw new Error(`Twilio SMS hatasi: ${detail}`)
+    }
+
+    return { provider: 'twilio', delivered: true, sid: json?.sid }
+  }
+
+  throw new Error(`Desteklenmeyen SMS provider: ${SMS_PROVIDER}`)
+}
+
+async function completePendingUserRegistration(pending, verificationMethod) {
+  const payload = JSON.parse(pending.payload)
+  const email = normalizeEmail(payload.email)
+
+  const existing = await db.get('SELECT id FROM users WHERE email = ?', [email])
+  if (existing) {
+    await db.run('DELETE FROM pending_registrations WHERE id = ?', [pending.id])
+    throw new Error('Bu email zaten kayıtlı')
+  }
+
+  const result = await db.run(
+    'INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)',
+    [payload.name, email, payload.phone || null, payload.passwordHash]
+  )
+
+  const user = {
+    id: result.lastID,
+    name: payload.name,
+    email,
+    phone: payload.phone || null,
+    verificationMethod,
+  }
+
+  const token = generateToken({ id: user.id, email: user.email })
+
+  await db.run('DELETE FROM pending_registrations WHERE id = ?', [pending.id])
+
+  return { user, token }
+}
+
 // Middleware: Authentication
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1]
@@ -315,60 +457,233 @@ function authMiddleware(req, res, next) {
 
 // User Registration
 app.post('/api/register-user', async (req,res)=>{
+  return res.status(403).json({
+    success: false,
+    error: 'Dogrudan kayit kapali. Once /api/register/start-user ile kaydi baslatin, sonra SMS veya Google ile dogrulayin.',
+  })
+})
+
+// Legacy alias to avoid route-not-found for old clients
+app.post('/api/register', (req, res) => {
+  return res.status(403).json({
+    success: false,
+    error: 'Bu endpoint artik desteklenmiyor. /api/register/start-user veya /api/register-company kullanin.',
+  })
+})
+
+// Step 1: Start pending registration
+app.post('/api/register/start-user', async (req, res) => {
   try {
     const { name, email, phone, password, confirmPassword } = req.body
+    const normalizedEmail = normalizeEmail(email)
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, error: 'Name, email, password gerekli' })
+    if (!name || !normalizedEmail || !password || !phone) {
+      return res.status(400).json({ success: false, error: 'Eksik alanı doldurunuz' })
+    }
+
+    if (!isValidTurkeyPhone(phone)) {
+      return res.status(400).json({ success: false, error: 'Eksik alanı doldurunuz' })
     }
 
     if (password.length < 6) {
-      return res.status(400).json({ success: false, error: 'Password en az 6 karakter olmalı' })
+      return res.status(400).json({ success: false, error: 'Şifre en az 6 karakter olmalı' })
     }
 
     if (password !== confirmPassword) {
-      return res.status(400).json({ success: false, error: 'Passwords eşleşmiyor' })
+      return res.status(400).json({ success: false, error: 'Şifreler eşleşmiyor' })
     }
 
-    const existing = await db.get('SELECT id FROM users WHERE email = ?', email)
+    const existing = await db.get('SELECT id FROM users WHERE email = ?', [normalizedEmail])
     if (existing) {
       return res.status(400).json({ success: false, error: 'Bu email zaten kayıtlı' })
     }
 
-    const hashedPassword = await hashPassword(password)
-    const result = await db.run(
-      'INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)',
-      [name, email, phone || null, hashedPassword]
+    await db.run('DELETE FROM pending_registrations WHERE email = ?', [normalizedEmail])
+
+    const pendingToken = createPendingToken()
+    const smsCode = createOtpCode()
+    const passwordHash = await hashPassword(password)
+    const expiresAt = expiresAtIso(REGISTER_OTP_EXPIRES_MINUTES)
+
+    const payload = JSON.stringify({
+      name: String(name).trim(),
+      email: normalizedEmail,
+      phone: (phone || '').trim() || null,
+      passwordHash,
+    })
+
+    await db.run(
+      `INSERT INTO pending_registrations
+       (token, accountType, email, phone, payload, smsCode, smsSentAt, expiresAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)`,
+      [pendingToken, 'user', normalizedEmail, (phone || '').trim() || null, payload, smsCode, expiresAt]
     )
 
-    const user = {
-      id: result.lastID,
-      name,
-      email,
-      phone: phone || null
+    let smsResult = null
+    if ((phone || '').trim()) {
+      smsResult = await sendVerificationSms(phone, smsCode)
     }
-
-    const token = generateToken({ id: user.id, email: user.email })
 
     res.status(201).json({
       success: true,
-      ok: true,
-      message: 'Kayıt başarılı',
-      user,
-      token
+      pendingToken,
+      expiresInMinutes: REGISTER_OTP_EXPIRES_MINUTES,
+      smsAvailable: Boolean((phone || '').trim()),
+      smsProvider: smsResult?.provider || SMS_PROVIDER,
+      demoSmsCode: SMS_PROVIDER === 'mock' ? smsCode : undefined,
+      message: 'Kayıt başlatıldı. Google veya SMS ile doğrulayarak tamamlayın.',
     })
   } catch (error) {
-    console.error('Register error:', error)
-    if (error?.code === 'SQLITE_CONSTRAINT') {
-      if (String(error?.message || '').includes('users.email')) {
-        return res.status(400).json({ success: false, error: 'Bu email zaten kayıtlı' })
-      }
-      if (String(error?.message || '').includes('users.phone')) {
-        return res.status(400).json({ success: false, error: 'Bu telefon zaten kayıtlı' })
-      }
-      return res.status(400).json({ success: false, error: 'Kayıt bilgileri zaten kullanımda' })
+    console.error('Start register error:', error)
+    res.status(500).json({ success: false, error: 'Kayıt başlatılamadı' })
+  }
+})
+
+// Step 2A: Resend SMS code
+app.post('/api/register/resend-sms', async (req, res) => {
+  try {
+    const { pendingToken } = req.body
+    if (!pendingToken) {
+      return res.status(400).json({ success: false, error: 'pendingToken gerekli' })
     }
-    res.status(500).json({ success: false, error: 'Server error' })
+
+    const pending = await db.get(
+      'SELECT id, phone FROM pending_registrations WHERE token = ? AND accountType = ?',
+      [pendingToken, 'user']
+    )
+
+    if (!pending) {
+      return res.status(404).json({ success: false, error: 'Bekleyen kayıt bulunamadı' })
+    }
+
+    if (!pending.phone) {
+      return res.status(400).json({ success: false, error: 'Bu kayıt için telefon bilgisi yok' })
+    }
+
+    const smsCode = createOtpCode()
+    const expiresAt = expiresAtIso(REGISTER_OTP_EXPIRES_MINUTES)
+
+    await db.run(
+      `UPDATE pending_registrations
+       SET smsCode = ?, smsSentAt = CURRENT_TIMESTAMP, expiresAt = ?, updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [smsCode, expiresAt, pending.id]
+    )
+
+    const smsResult = await sendVerificationSms(pending.phone, smsCode)
+
+    res.json({
+      success: true,
+      message: 'SMS doğrulama kodu yeniden gönderildi',
+      expiresInMinutes: REGISTER_OTP_EXPIRES_MINUTES,
+      smsProvider: smsResult?.provider || SMS_PROVIDER,
+      demoSmsCode: SMS_PROVIDER === 'mock' ? smsCode : undefined,
+    })
+  } catch (error) {
+    console.error('Resend SMS error:', error)
+    res.status(500).json({ success: false, error: 'SMS kodu gönderilemedi' })
+  }
+})
+
+// Step 2B: Verify by SMS code and complete registration
+app.post('/api/register/verify-sms', async (req, res) => {
+  try {
+    const { pendingToken, smsCode } = req.body
+
+    if (!pendingToken || !smsCode) {
+      return res.status(400).json({ success: false, error: 'pendingToken ve smsCode zorunludur' })
+    }
+
+    const pending = await db.get(
+      `SELECT * FROM pending_registrations
+       WHERE token = ? AND accountType = ?`,
+      [pendingToken, 'user']
+    )
+
+    if (!pending) {
+      return res.status(404).json({ success: false, error: 'Bekleyen kayıt bulunamadı' })
+    }
+
+    if (isExpired(pending.expiresAt)) {
+      await db.run('DELETE FROM pending_registrations WHERE id = ?', [pending.id])
+      return res.status(400).json({ success: false, error: 'Doğrulama süresi doldu. Lütfen tekrar kayıt olun.' })
+    }
+
+    if (String(pending.smsCode) !== String(smsCode).trim()) {
+      return res.status(400).json({ success: false, error: 'SMS doğrulama kodu hatalı' })
+    }
+
+    const { user, token } = await completePendingUserRegistration(pending, 'sms')
+
+    res.json({
+      success: true,
+      message: 'SMS doğrulaması tamamlandı, kayıt oluşturuldu',
+      user,
+      token,
+    })
+  } catch (error) {
+    if (error.message === 'Bu email zaten kayıtlı') {
+      return res.status(400).json({ success: false, error: error.message })
+    }
+
+    console.error('Verify SMS register error:', error)
+    res.status(500).json({ success: false, error: 'SMS doğrulaması başarısız' })
+  }
+})
+
+// Step 2C: Verify by Google token and complete registration
+app.post('/api/register/verify-google', async (req, res) => {
+  try {
+    const { pendingToken, idToken } = req.body
+
+    if (!pendingToken || !idToken) {
+      return res.status(400).json({ success: false, error: 'pendingToken ve idToken zorunludur' })
+    }
+
+    const pending = await db.get(
+      `SELECT * FROM pending_registrations
+       WHERE token = ? AND accountType = ?`,
+      [pendingToken, 'user']
+    )
+
+    if (!pending) {
+      return res.status(404).json({ success: false, error: 'Bekleyen kayıt bulunamadı' })
+    }
+
+    if (isExpired(pending.expiresAt)) {
+      await db.run('DELETE FROM pending_registrations WHERE id = ?', [pending.id])
+      return res.status(400).json({ success: false, error: 'Doğrulama süresi doldu. Lütfen tekrar kayıt olun.' })
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: GOOGLE_CLIENT_ID,
+    })
+
+    const googleEmail = normalizeEmail(ticket.getPayload()?.email)
+    if (!googleEmail) {
+      return res.status(400).json({ success: false, error: 'Google hesabından email alınamadı' })
+    }
+
+    if (googleEmail !== normalizeEmail(pending.email)) {
+      return res.status(400).json({ success: false, error: 'Google email ile kayıt email aynı olmalıdır' })
+    }
+
+    const { user, token } = await completePendingUserRegistration(pending, 'google')
+
+    res.json({
+      success: true,
+      message: 'Google doğrulaması tamamlandı, kayıt oluşturuldu',
+      user,
+      token,
+    })
+  } catch (error) {
+    if (error.message === 'Bu email zaten kayıtlı') {
+      return res.status(400).json({ success: false, error: error.message })
+    }
+
+    console.error('Verify Google register error:', error)
+    res.status(500).json({ success: false, error: 'Google doğrulaması başarısız' })
   }
 })
 
@@ -426,7 +741,11 @@ app.post('/api/register-company', async (req,res)=>{
     } = req.body
 
     if (!name || !email || !taxNumber || !password || !city || !toCity || !phone) {
-      return res.status(400).json({ success: false, error: 'Tüm gerekli alanları doldurun' })
+      return res.status(400).json({ success: false, error: 'Eksik alanı doldurunuz' })
+    }
+
+    if (!isValidTurkeyPhone(phone)) {
+      return res.status(400).json({ success: false, error: 'Eksik alanı doldurunuz' })
     }
 
     if (password.length < 6) {

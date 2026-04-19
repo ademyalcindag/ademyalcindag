@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
 import { API } from '../data'
 
-// Google Cloud Console'dan aldığınız Client ID buraya gelecek
-const GOOGLE_CLIENT_ID = "703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com"
+const GOOGLE_CLIENT_ID = (
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  import.meta.env.VITE_GOOGLE_CLIENTID ||
+  '703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com'
+).trim()
 
 export default function Auth(){
   const navigate = useNavigate()
@@ -165,7 +168,7 @@ export default function Auth(){
                         onSuccess={handleGoogleSuccess}
                         onError={() => {
                           console.error('Google Login Başarısız')
-                          alert('Google bağlantısı sırasında hata oluştu. Lütfen tekrar deneyin.')
+                          alert('Google yetkilendirme hatası. Domainini Google Cloud Console > Authorized JavaScript origins listesine ekle ve VITE_GOOGLE_CLIENT_ID değerini kontrol et.')
                         }}
                         theme="filled_blue"
                         text="signin_with"
@@ -234,7 +237,7 @@ export default function Auth(){
                 onSuccess={handleGoogleSuccess}
                 onError={() => {
                   console.error('Google Kayıt Başarısız')
-                  alert('Google bağlantısı sırasında hata oluştu. Lütfen tekrar deneyin.')
+                  alert('Google yetkilendirme hatası. Domainini Google Cloud Console > Authorized JavaScript origins listesine ekle ve VITE_GOOGLE_CLIENT_ID değerini kontrol et.')
                 }}
                 theme="filled_blue"
                 text="signup_with"
@@ -267,7 +270,7 @@ export default function Auth(){
                 onSuccess={handleGoogleSuccess}
                 onError={() => {
                   console.error('Google Kayıt Başarısız')
-                  alert('Google bağlantısı sırasında hata oluştu. Lütfen tekrar deneyin.')
+                  alert('Google yetkilendirme hatası. Domainini Google Cloud Console > Authorized JavaScript origins listesine ekle ve VITE_GOOGLE_CLIENT_ID değerini kontrol et.')
                 }}
                 theme="filled_blue"
                 text="signup_with"

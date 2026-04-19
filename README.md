@@ -84,6 +84,7 @@ Bu komut otomatik olarak build yapar ve Hostinger için hazırlar.
    PORT=3001
    JWT_SECRET=your-secret-key
    GOOGLE_CLIENT_ID=your-google-client-id
+   VITE_GOOGLE_CLIENT_ID=your-google-client-id
    CORS_ORIGINS=https://www.tasimacilikrehberi.com,https://tasimacilikrehberi.com
    ```
 

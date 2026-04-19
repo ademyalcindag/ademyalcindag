@@ -55,6 +55,7 @@ cat .env
 
 ```
 GOOGLE_CLIENT_ID=703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com
 CORS_ORIGINS=https://www.tasimacilik-rehberi.com,https://tasimacilik-rehberi.com
 VITE_API_URL=https://www.tasimacilik-rehberi.com
 PORT=3001

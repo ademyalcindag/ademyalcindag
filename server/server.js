@@ -25,6 +25,7 @@ const __dirname = path.resolve()
 const uploadDir = path.join(__dirname, 'uploads')
 const distDir = path.join(__dirname, 'dist')
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'server.db')
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir)
 
 const upload = multer({ dest: uploadDir })
@@ -100,16 +101,34 @@ const SALT_ROUNDS = 10
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com'
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID)
 const REGISTER_OTP_EXPIRES_MINUTES = 10
-const SMS_PROVIDER = String(process.env.SMS_PROVIDER || 'mock').trim().toLowerCase()
+const SMS_PROVIDER = String(process.env.SMS_PROVIDER || (IS_PRODUCTION ? 'twilio' : 'mock')).trim().toLowerCase()
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || ''
 const SMS_DEFAULT_COUNTRY_CODE = process.env.SMS_DEFAULT_COUNTRY_CODE || '+90'
-const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || 'mock').trim().toLowerCase()
+const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || (IS_PRODUCTION ? 'resend' : 'mock')).trim().toLowerCase()
 const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
 const EMAIL_FROM = process.env.EMAIL_FROM || 'no-reply@tasimacilikrehberi.com'
 
 let db
+
+function validateRuntimeConfig() {
+  if (IS_PRODUCTION && SMS_PROVIDER === 'mock') {
+    throw new Error('Production ortaminda SMS_PROVIDER=mock kullanilamaz. Gercek bir SMS saglayicisi tanimlayin.')
+  }
+
+  if (IS_PRODUCTION && EMAIL_PROVIDER === 'mock') {
+    throw new Error('Production ortaminda EMAIL_PROVIDER=mock kullanilamaz. Gercek bir e-posta saglayicisi tanimlayin.')
+  }
+
+  if (SMS_PROVIDER === 'twilio' && (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER)) {
+    throw new Error('Twilio SMS icin TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN ve TWILIO_FROM_NUMBER zorunludur')
+  }
+
+  if (EMAIL_PROVIDER === 'resend' && (!RESEND_API_KEY || !EMAIL_FROM)) {
+    throw new Error('Resend e-posta icin RESEND_API_KEY ve EMAIL_FROM zorunludur')
+  }
+}
 
 async function tableHasColumn(tableName, columnName) {
   const columns = await db.all(`PRAGMA table_info(${tableName})`)
@@ -397,7 +416,7 @@ async function sendVerificationSms(phone, code) {
 
   const message = `Tasima Rehberi dogrulama kodunuz: ${code}`
 
-  if (SMS_PROVIDER === 'mock') {
+  if (SMS_PROVIDER === 'mock' && !IS_PRODUCTION) {
     console.log(`📩 [MOCK SMS] ${normalizedPhone}: ${message}`)
     return { provider: 'mock', delivered: true }
   }
@@ -452,7 +471,7 @@ async function sendActivationEmail(email, code, userName) {
     </div>
   `
 
-  if (EMAIL_PROVIDER === 'mock') {
+  if (EMAIL_PROVIDER === 'mock' && !IS_PRODUCTION) {
     console.log(`📧 [MOCK EMAIL] to:${safeEmail} subject:${subject} code:${code}`)
     return { provider: 'mock', delivered: true }
   }
@@ -630,8 +649,6 @@ app.post('/api/register/start-user', async (req, res) => {
       emailAvailable: Boolean(normalizedEmail),
       smsProvider: smsResult?.provider || SMS_PROVIDER,
       emailProvider: emailResult?.provider || EMAIL_PROVIDER,
-      demoSmsCode: SMS_PROVIDER === 'mock' ? smsCode : undefined,
-      demoEmailCode: EMAIL_PROVIDER === 'mock' ? emailCode : undefined,
       message: 'Kayit baslatildi. E-posta ve SMS kodlarini dogrulayarak kaydi tamamlayin.',
     })
   } catch (error) {
@@ -741,7 +758,6 @@ app.post('/api/register/resend-sms', async (req, res) => {
       message: 'SMS doğrulama kodu yeniden gönderildi',
       expiresInMinutes: REGISTER_OTP_EXPIRES_MINUTES,
       smsProvider: smsResult?.provider || SMS_PROVIDER,
-      demoSmsCode: SMS_PROVIDER === 'mock' ? smsCode : undefined,
     })
   } catch (error) {
     console.error('Resend SMS error:', error)
@@ -1862,6 +1878,7 @@ const PORT = process.env.PORT || 3001;
 
 async function startServer() {
   try {
+    validateRuntimeConfig();
     await initDb();
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server is running on port ${PORT}`);

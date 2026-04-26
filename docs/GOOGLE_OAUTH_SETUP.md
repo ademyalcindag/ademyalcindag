@@ -152,23 +152,19 @@ Backend endpointleri:
 
 ```bash
 # SMS
-SMS_PROVIDER=mock
+SMS_PROVIDER=twilio
 SMS_DEFAULT_COUNTRY_CODE=+90
-# Twilio kullanacaksan:
-# SMS_PROVIDER=twilio
-# TWILIO_ACCOUNT_SID=...
-# TWILIO_AUTH_TOKEN=...
-# TWILIO_FROM_NUMBER=+1...
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_FROM_NUMBER=+1...
 
 # E-posta
-EMAIL_PROVIDER=mock
+EMAIL_PROVIDER=resend
 EMAIL_FROM=no-reply@tasimacilikrehberi.com
-# Resend kullanacaksan:
-# EMAIL_PROVIDER=resend
-# RESEND_API_KEY=re_...
+RESEND_API_KEY=re_...
 ```
 
 ### Test Notu
 
-- `mock` modunda sistem gerçek SMS/e-posta göndermez.
-- Kodlar backend loguna düşer ve frontend'de demo kod olarak gösterilir.
+- Production ortamında `mock` sağlayıcı kullanımı kapatıldı.
+- Canlı sitede Twilio ve Resend bilgileri tanımlı değilse kayıt servisi ayağa kalkmaz.

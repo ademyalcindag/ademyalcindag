@@ -103,8 +103,6 @@ export const API = {
           pendingToken: parsed.raw?.pendingToken,
           smsAvailable: Boolean(parsed.raw?.smsAvailable),
           emailAvailable: Boolean(parsed.raw?.emailAvailable),
-          demoSmsCode: parsed.raw?.demoSmsCode,
-          demoEmailCode: parsed.raw?.demoEmailCode,
           expiresInMinutes: parsed.raw?.expiresInMinutes,
         }
       : { ok: false, error: parsed.error }
@@ -139,7 +137,7 @@ export const API = {
     const parsed = await parseJsonResponse(res)
 
     return parsed.ok
-      ? { ok: true, demoSmsCode: parsed.raw?.demoSmsCode, message: parsed.raw?.message }
+      ? { ok: true, message: parsed.raw?.message }
       : { ok: false, error: parsed.error }
   },
 

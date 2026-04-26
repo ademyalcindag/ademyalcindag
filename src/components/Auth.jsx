@@ -114,21 +114,11 @@ export default function Auth(){
         pendingToken: res.pendingToken,
         smsAvailable: res.smsAvailable,
         emailAvailable: res.emailAvailable,
-        demoSmsCode: res.demoSmsCode,
-        demoEmailCode: res.demoEmailCode,
         email: obj.email,
         phone: obj.phone || '',
       })
       setSmsCode('')
       setEmailCode('')
-
-      if (res.demoSmsCode) {
-        alert(`Demo SMS kodu: ${res.demoSmsCode}`)
-      }
-
-      if (res.demoEmailCode) {
-        alert(`Demo e-posta kodu: ${res.demoEmailCode}`)
-      }
 
       return
     }
@@ -301,16 +291,7 @@ export default function Auth(){
       return
     }
 
-    setPendingRegistration((prev) => ({
-      ...prev,
-      demoSmsCode: res.demoSmsCode || prev?.demoSmsCode,
-    }))
-
-    if (res.demoSmsCode) {
-      alert(`Yeni demo SMS kodu: ${res.demoSmsCode}`)
-    } else {
-      alert(res.message || 'SMS kodu yeniden gönderildi')
-    }
+    alert(res.message || 'SMS kodu yeniden gönderildi')
   }
 
   return (
@@ -442,6 +423,22 @@ export default function Auth(){
             </div>
             <div style={{marginTop:'12px', fontSize:'13px', color:'#6b7280'}}>
               Kayıt tamamlamak için bir sonraki adımda Google veya SMS kodu ile doğrulama yapacaksınız.
+            </div>
+
+            <div style={{textAlign:'center', marginTop:'10px', color:'#6b7280', fontSize:'13px'}}>Veya Google ile kayıt olun:</div>
+            <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleLoginSuccess}
+                onError={() => {
+                  console.error('Google Kayıt Başarısız')
+                  alert('Google yetkilendirme hatası. Domainini Google Cloud Console > Authorized JavaScript origins listesine ekle ve VITE_GOOGLE_CLIENT_ID değerini kontrol et.')
+                }}
+                theme="filled_blue"
+                text="signup_with"
+                shape="rectangular"
+                size="medium"
+                locale="tr"
+              />
             </div>
           </form>
         )}

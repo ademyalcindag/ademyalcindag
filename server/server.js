@@ -588,13 +588,6 @@ app.post('/api/register', (req, res) => {
 // Step 1: Start pending registration
 app.post('/api/register/start-user', async (req, res) => {
   try {
-    if (EMAIL_PROVIDER === 'disabled') {
-      return res.status(503).json({
-        success: false,
-        error: 'Kayıt geçici olarak kapalı. Lütfen daha sonra tekrar deneyin.',
-      })
-    }
-
     const { name, email, phone, password, confirmPassword } = req.body
     const normalizedEmail = normalizeEmail(email)
     const normalizedPhone = String(phone || '').trim() || null
@@ -618,6 +611,31 @@ app.post('/api/register/start-user', async (req, res) => {
     const existing = await db.get('SELECT id FROM users WHERE email = ?', [normalizedEmail])
     if (existing) {
       return res.status(400).json({ success: false, error: 'Bu email zaten kayıtlı' })
+    }
+
+    if (EMAIL_PROVIDER === 'disabled') {
+      const directPasswordHash = await hashPassword(password)
+      const directResult = await db.run(
+        'INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)',
+        [String(name).trim(), normalizedEmail, normalizedPhone, directPasswordHash]
+      )
+
+      const user = {
+        id: directResult.lastID,
+        name: String(name).trim(),
+        email: normalizedEmail,
+        phone: normalizedPhone,
+      }
+
+      const token = generateToken({ id: user.id, email: user.email })
+
+      return res.status(201).json({
+        success: true,
+        directRegistration: true,
+        message: 'Kayıt oluşturuldu',
+        user,
+        token,
+      })
     }
 
     await db.run('DELETE FROM pending_registrations WHERE email = ?', [normalizedEmail])

@@ -129,3 +129,46 @@ pm2 logs tasimacilik
 - 🔐 [Google Cloud Console](https://console.cloud.google.com)
 - 📚 [Google OAuth Docs](https://developers.google.com/identity/protocols/oauth2)
 - 🐛 [Browser DevTools](chrome://devtools)
+
+---
+
+## Yeni Kayıt Doğrulama (E-posta + SMS)
+
+Kullanıcı kaydında artık iki adım zorunlu:
+
+1. E-posta aktivasyon kodu
+2. SMS doğrulama kodu
+
+Backend endpointleri:
+
+- `POST /api/register/start-user`
+- `POST /api/register/verify-email`
+- `POST /api/register/verify-sms`
+- `POST /api/register/resend-sms`
+
+### Environment Variables
+
+`.env` dosyasına aşağıdaki alanları ekle:
+
+```bash
+# SMS
+SMS_PROVIDER=mock
+SMS_DEFAULT_COUNTRY_CODE=+90
+# Twilio kullanacaksan:
+# SMS_PROVIDER=twilio
+# TWILIO_ACCOUNT_SID=...
+# TWILIO_AUTH_TOKEN=...
+# TWILIO_FROM_NUMBER=+1...
+
+# E-posta
+EMAIL_PROVIDER=mock
+EMAIL_FROM=no-reply@tasimacilikrehberi.com
+# Resend kullanacaksan:
+# EMAIL_PROVIDER=resend
+# RESEND_API_KEY=re_...
+```
+
+### Test Notu
+
+- `mock` modunda sistem gerçek SMS/e-posta göndermez.
+- Kodlar backend loguna düşer ve frontend'de demo kod olarak gösterilir.

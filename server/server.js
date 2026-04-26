@@ -105,6 +105,9 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || ''
 const SMS_DEFAULT_COUNTRY_CODE = process.env.SMS_DEFAULT_COUNTRY_CODE || '+90'
+const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || 'mock').trim().toLowerCase()
+const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
+const EMAIL_FROM = process.env.EMAIL_FROM || 'no-reply@tasimacilikrehberi.com'
 
 let db
 
@@ -137,6 +140,10 @@ async function runSchemaMigrations() {
   await ensureColumn('messages', 'senderEmail', 'TEXT')
   await ensureColumn('messages', 'message', 'TEXT')
   await ensureColumn('messages', 'read', 'BOOLEAN DEFAULT 0')
+  await ensureColumn('pending_registrations', 'emailCode', 'TEXT')
+  await ensureColumn('pending_registrations', 'emailVerified', 'BOOLEAN DEFAULT 0')
+  await ensureColumn('pending_registrations', 'smsVerified', 'BOOLEAN DEFAULT 0')
+  await ensureColumn('pending_registrations', 'verificationCompletedAt', 'DATETIME')
 
   const hasToFirm = await tableHasColumn('messages', 'toFirm')
   if (hasToFirm) {
@@ -156,6 +163,8 @@ async function runSchemaMigrations() {
   await db.exec("UPDATE messages SET senderName = COALESCE(senderName, 'Anonim')")
   await db.exec("UPDATE messages SET senderEmail = COALESCE(senderEmail, 'unknown@example.com')")
   await db.exec("UPDATE messages SET message = COALESCE(message, '')")
+  await db.exec('UPDATE pending_registrations SET emailVerified = COALESCE(emailVerified, 0)')
+  await db.exec('UPDATE pending_registrations SET smsVerified = COALESCE(smsVerified, 0)')
 
   await ensureColumn('prices', 'createdAt', 'DATETIME DEFAULT CURRENT_TIMESTAMP')
 }
@@ -267,11 +276,28 @@ async function initDb(){
       email TEXT NOT NULL,
       phone TEXT,
       payload TEXT NOT NULL,
+      emailCode TEXT,
+      emailVerified BOOLEAN DEFAULT 0,
+      smsVerified BOOLEAN DEFAULT 0,
       smsCode TEXT,
       smsSentAt DATETIME,
+      verificationCompletedAt DATETIME,
       expiresAt DATETIME NOT NULL,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
       updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS user_chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      firmId INTEGER NOT NULL,
+      senderType TEXT NOT NULL,
+      message TEXT NOT NULL,
+      readByUser BOOLEAN DEFAULT 0,
+      readByFirm BOOLEAN DEFAULT 0,
+      createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(firmId) REFERENCES firms(id) ON DELETE CASCADE
     );
 
   `)
@@ -288,6 +314,9 @@ async function initDb(){
   if (await tableHasColumn('prices', 'firmId')) {
     await db.exec('CREATE INDEX IF NOT EXISTS idx_prices_firmId ON prices(firmId)')
   }
+
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_user_chat_userId ON user_chat_messages(userId)')
+  await db.exec('CREATE INDEX IF NOT EXISTS idx_user_chat_firmId ON user_chat_messages(firmId)')
 
   // Demo hesapları temizle
   await db.run("DELETE FROM firms WHERE name IN ('Metro Taşıma', 'Anadolu Nakliyat')")
@@ -407,6 +436,57 @@ async function sendVerificationSms(phone, code) {
   throw new Error(`Desteklenmeyen SMS provider: ${SMS_PROVIDER}`)
 }
 
+async function sendActivationEmail(email, code, userName) {
+  const safeEmail = normalizeEmail(email)
+  if (!safeEmail) {
+    throw new Error('Gecerli e-posta adresi gerekli')
+  }
+
+  const subject = 'Tasima Rehberi - E-posta Aktivasyon Kodu'
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
+      <h2 style="margin-bottom:8px">Merhaba ${userName || ''}</h2>
+      <p>Hesabini etkinlestirmek icin asagidaki kodu gir:</p>
+      <div style="font-size:28px;font-weight:700;letter-spacing:4px;margin:16px 0">${code}</div>
+      <p>Kod 10 dakika boyunca gecerlidir.</p>
+    </div>
+  `
+
+  if (EMAIL_PROVIDER === 'mock') {
+    console.log(`📧 [MOCK EMAIL] to:${safeEmail} subject:${subject} code:${code}`)
+    return { provider: 'mock', delivered: true }
+  }
+
+  if (EMAIL_PROVIDER === 'resend') {
+    if (!RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY gerekli')
+    }
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${RESEND_API_KEY}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: EMAIL_FROM,
+        to: [safeEmail],
+        subject,
+        html,
+      }),
+    })
+
+    const json = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(`E-posta gonderilemedi: ${json?.message || 'Bilinmeyen hata'}`)
+    }
+
+    return { provider: 'resend', delivered: true, id: json?.id }
+  }
+
+  throw new Error(`Desteklenmeyen EMAIL_PROVIDER: ${EMAIL_PROVIDER}`)
+}
+
 async function completePendingUserRegistration(pending, verificationMethod) {
   const payload = JSON.parse(pending.payload)
   const email = normalizeEmail(payload.email)
@@ -435,6 +515,21 @@ async function completePendingUserRegistration(pending, verificationMethod) {
   await db.run('DELETE FROM pending_registrations WHERE id = ?', [pending.id])
 
   return { user, token }
+}
+
+async function tryCompletePendingRegistration(pending) {
+  if (!pending?.emailVerified || !pending?.smsVerified) {
+    return null
+  }
+
+  await db.run(
+    `UPDATE pending_registrations
+     SET verificationCompletedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [pending.id]
+  )
+
+  return completePendingUserRegistration(pending, 'email_sms')
 }
 
 // Middleware: Authentication
@@ -502,6 +597,7 @@ app.post('/api/register/start-user', async (req, res) => {
 
     const pendingToken = createPendingToken()
     const smsCode = createOtpCode()
+    const emailCode = createOtpCode()
     const passwordHash = await hashPassword(password)
     const expiresAt = expiresAtIso(REGISTER_OTP_EXPIRES_MINUTES)
 
@@ -514,9 +610,9 @@ app.post('/api/register/start-user', async (req, res) => {
 
     await db.run(
       `INSERT INTO pending_registrations
-       (token, accountType, email, phone, payload, smsCode, smsSentAt, expiresAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)`,
-      [pendingToken, 'user', normalizedEmail, (phone || '').trim() || null, payload, smsCode, expiresAt]
+       (token, accountType, email, phone, payload, emailCode, emailVerified, smsCode, smsVerified, smsSentAt, expiresAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)`,
+      [pendingToken, 'user', normalizedEmail, (phone || '').trim() || null, payload, emailCode, smsCode, expiresAt]
     )
 
     let smsResult = null
@@ -524,18 +620,86 @@ app.post('/api/register/start-user', async (req, res) => {
       smsResult = await sendVerificationSms(phone, smsCode)
     }
 
+    const emailResult = await sendActivationEmail(normalizedEmail, emailCode, String(name || '').trim())
+
     res.status(201).json({
       success: true,
       pendingToken,
       expiresInMinutes: REGISTER_OTP_EXPIRES_MINUTES,
       smsAvailable: Boolean((phone || '').trim()),
+      emailAvailable: Boolean(normalizedEmail),
       smsProvider: smsResult?.provider || SMS_PROVIDER,
+      emailProvider: emailResult?.provider || EMAIL_PROVIDER,
       demoSmsCode: SMS_PROVIDER === 'mock' ? smsCode : undefined,
-      message: 'Kayıt başlatıldı. Google veya SMS ile doğrulayarak tamamlayın.',
+      demoEmailCode: EMAIL_PROVIDER === 'mock' ? emailCode : undefined,
+      message: 'Kayit baslatildi. E-posta ve SMS kodlarini dogrulayarak kaydi tamamlayin.',
     })
   } catch (error) {
     console.error('Start register error:', error)
     res.status(500).json({ success: false, error: 'Kayıt başlatılamadı' })
+  }
+})
+
+app.post('/api/register/verify-email', async (req, res) => {
+  try {
+    const { pendingToken, emailCode } = req.body
+
+    if (!pendingToken || !emailCode) {
+      return res.status(400).json({ success: false, error: 'pendingToken ve emailCode zorunludur' })
+    }
+
+    const pending = await db.get(
+      `SELECT * FROM pending_registrations
+       WHERE token = ? AND accountType = ?`,
+      [pendingToken, 'user']
+    )
+
+    if (!pending) {
+      return res.status(404).json({ success: false, error: 'Bekleyen kayıt bulunamadı' })
+    }
+
+    if (isExpired(pending.expiresAt)) {
+      await db.run('DELETE FROM pending_registrations WHERE id = ?', [pending.id])
+      return res.status(400).json({ success: false, error: 'Doğrulama süresi doldu. Lütfen tekrar kayıt olun.' })
+    }
+
+    if (String(pending.emailCode) !== String(emailCode).trim()) {
+      return res.status(400).json({ success: false, error: 'E-posta doğrulama kodu hatalı' })
+    }
+
+    await db.run(
+      `UPDATE pending_registrations
+       SET emailVerified = 1, updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [pending.id]
+    )
+
+    const updatedPending = { ...pending, emailVerified: 1 }
+    const completed = await tryCompletePendingRegistration(updatedPending)
+
+    if (completed) {
+      return res.json({
+        success: true,
+        completed: true,
+        message: 'E-posta ve SMS doğrulaması tamamlandı, kayıt oluşturuldu',
+        user: completed.user,
+        token: completed.token,
+      })
+    }
+
+    res.json({
+      success: true,
+      completed: false,
+      nextStep: 'sms',
+      message: 'E-posta doğrulandı. Kayıt tamamlamak için SMS doğrulamasını tamamlayın.',
+    })
+  } catch (error) {
+    if (error.message === 'Bu email zaten kayıtlı') {
+      return res.status(400).json({ success: false, error: error.message })
+    }
+
+    console.error('Verify email register error:', error)
+    res.status(500).json({ success: false, error: 'E-posta doğrulaması başarısız' })
   }
 })
 
@@ -613,13 +777,31 @@ app.post('/api/register/verify-sms', async (req, res) => {
       return res.status(400).json({ success: false, error: 'SMS doğrulama kodu hatalı' })
     }
 
-    const { user, token } = await completePendingUserRegistration(pending, 'sms')
+    await db.run(
+      `UPDATE pending_registrations
+       SET smsVerified = 1, updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [pending.id]
+    )
+
+    const updatedPending = { ...pending, smsVerified: 1 }
+    const completed = await tryCompletePendingRegistration(updatedPending)
+
+    if (completed) {
+      return res.json({
+        success: true,
+        completed: true,
+        message: 'E-posta ve SMS doğrulaması tamamlandı, kayıt oluşturuldu',
+        user: completed.user,
+        token: completed.token,
+      })
+    }
 
     res.json({
       success: true,
-      message: 'SMS doğrulaması tamamlandı, kayıt oluşturuldu',
-      user,
-      token,
+      completed: false,
+      nextStep: 'email',
+      message: 'SMS doğrulandı. Kayıt tamamlamak için e-posta doğrulamasını tamamlayın.',
     })
   } catch (error) {
     if (error.message === 'Bu email zaten kayıtlı') {
@@ -669,13 +851,31 @@ app.post('/api/register/verify-google', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Google email ile kayıt email aynı olmalıdır' })
     }
 
-    const { user, token } = await completePendingUserRegistration(pending, 'google')
+    await db.run(
+      `UPDATE pending_registrations
+       SET emailVerified = 1, updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [pending.id]
+    )
+
+    const updatedPending = { ...pending, emailVerified: 1 }
+    const completed = await tryCompletePendingRegistration(updatedPending)
+
+    if (completed) {
+      return res.json({
+        success: true,
+        completed: true,
+        message: 'Google ve SMS doğrulaması tamamlandı, kayıt oluşturuldu',
+        user: completed.user,
+        token: completed.token,
+      })
+    }
 
     res.json({
       success: true,
-      message: 'Google doğrulaması tamamlandı, kayıt oluşturuldu',
-      user,
-      token,
+      completed: false,
+      nextStep: 'sms',
+      message: 'Google doğrulaması tamamlandı. Kayıt tamamlamak için SMS doğrulamasını tamamlayın.',
     })
   } catch (error) {
     if (error.message === 'Bu email zaten kayıtlı') {
@@ -726,6 +926,262 @@ app.post('/api/login', async (req,res)=>{
     })
   } catch (error) {
     console.error('Login error:', error)
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.get('/api/users/me', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.isCompany) {
+      return res.status(403).json({ success: false, error: 'Sadece kullanıcı hesabı erişebilir' })
+    }
+
+    const user = await db.get('SELECT id, name, email, phone, picture, createdAt, updatedAt FROM users WHERE id = ?', [req.user.id])
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' })
+    }
+
+    res.json({ success: true, data: user })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.put('/api/users/me', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.isCompany) {
+      return res.status(403).json({ success: false, error: 'Sadece kullanıcı hesabı erişebilir' })
+    }
+
+    const { name, phone } = req.body
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Ad soyad zorunludur' })
+    }
+
+    const normalizedPhone = String(phone || '').trim() || null
+    if (normalizedPhone && !isValidTurkeyPhone(normalizedPhone)) {
+      return res.status(400).json({ success: false, error: 'Telefon formatı geçersiz' })
+    }
+
+    await db.run(
+      `UPDATE users
+       SET name = ?, phone = ?, updatedAt = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [String(name).trim(), normalizedPhone, req.user.id]
+    )
+
+    const user = await db.get('SELECT id, name, email, phone, picture, createdAt, updatedAt FROM users WHERE id = ?', [req.user.id])
+    res.json({ success: true, message: 'Profil güncellendi', data: user })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.get('/api/user/chats', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.isCompany) {
+      return res.status(403).json({ success: false, error: 'Sadece kullanıcı hesabı erişebilir' })
+    }
+
+    const threads = await db.all(
+      `SELECT
+         m.firmId,
+         f.name as firmName,
+         MAX(m.createdAt) as lastMessageAt,
+         SUM(CASE WHEN m.senderType = 'firm' AND m.readByUser = 0 THEN 1 ELSE 0 END) as unreadCount,
+         (
+           SELECT message
+           FROM user_chat_messages latest
+           WHERE latest.userId = m.userId AND latest.firmId = m.firmId
+           ORDER BY latest.createdAt DESC, latest.id DESC
+           LIMIT 1
+         ) as lastMessage
+       FROM user_chat_messages m
+       JOIN firms f ON f.id = m.firmId
+       WHERE m.userId = ?
+       GROUP BY m.firmId, f.name
+       ORDER BY lastMessageAt DESC`,
+      [req.user.id]
+    )
+
+    res.json({ success: true, data: threads })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.get('/api/user/chats/:firmId', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.isCompany) {
+      return res.status(403).json({ success: false, error: 'Sadece kullanıcı hesabı erişebilir' })
+    }
+
+    const firmId = Number(req.params.firmId)
+    if (!Number.isInteger(firmId) || firmId <= 0) {
+      return res.status(400).json({ success: false, error: 'Geçersiz firma ID' })
+    }
+
+    const messages = await db.all(
+      `SELECT id, userId, firmId, senderType, message, readByUser, readByFirm, createdAt
+       FROM user_chat_messages
+       WHERE userId = ? AND firmId = ?
+       ORDER BY createdAt ASC, id ASC
+       LIMIT 300`,
+      [req.user.id, firmId]
+    )
+
+    await db.run(
+      `UPDATE user_chat_messages
+       SET readByUser = 1
+       WHERE userId = ? AND firmId = ? AND senderType = 'firm' AND readByUser = 0`,
+      [req.user.id, firmId]
+    )
+
+    res.json({ success: true, data: messages })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.post('/api/user/chats/:firmId', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.isCompany) {
+      return res.status(403).json({ success: false, error: 'Sadece kullanıcı hesabı erişebilir' })
+    }
+
+    const firmId = Number(req.params.firmId)
+    const message = String(req.body?.message || '').trim()
+
+    if (!Number.isInteger(firmId) || firmId <= 0) {
+      return res.status(400).json({ success: false, error: 'Geçersiz firma ID' })
+    }
+
+    if (!message) {
+      return res.status(400).json({ success: false, error: 'Mesaj boş olamaz' })
+    }
+
+    const firm = await db.get('SELECT id FROM firms WHERE id = ?', [firmId])
+    if (!firm) {
+      return res.status(404).json({ success: false, error: 'Firma bulunamadı' })
+    }
+
+    const insert = await db.run(
+      `INSERT INTO user_chat_messages
+       (userId, firmId, senderType, message, readByUser, readByFirm)
+       VALUES (?, ?, 'user', ?, 1, 0)`,
+      [req.user.id, firmId, message]
+    )
+
+    const row = await db.get('SELECT * FROM user_chat_messages WHERE id = ?', [insert.lastID])
+    res.status(201).json({ success: true, data: row })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.get('/api/firms/:firmId/chats', authMiddleware, async (req, res) => {
+  try {
+    const firmId = Number(req.params.firmId)
+    if (!req.user.isCompany || req.user.id !== firmId) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' })
+    }
+
+    const threads = await db.all(
+      `SELECT
+         m.userId,
+         u.name as userName,
+         u.email as userEmail,
+         MAX(m.createdAt) as lastMessageAt,
+         SUM(CASE WHEN m.senderType = 'user' AND m.readByFirm = 0 THEN 1 ELSE 0 END) as unreadCount,
+         (
+           SELECT message
+           FROM user_chat_messages latest
+           WHERE latest.userId = m.userId AND latest.firmId = m.firmId
+           ORDER BY latest.createdAt DESC, latest.id DESC
+           LIMIT 1
+         ) as lastMessage
+       FROM user_chat_messages m
+       JOIN users u ON u.id = m.userId
+       WHERE m.firmId = ?
+       GROUP BY m.userId, u.name, u.email
+       ORDER BY lastMessageAt DESC`,
+      [firmId]
+    )
+
+    res.json({ success: true, data: threads })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.get('/api/firms/:firmId/chats/:userId', authMiddleware, async (req, res) => {
+  try {
+    const firmId = Number(req.params.firmId)
+    const userId = Number(req.params.userId)
+
+    if (!req.user.isCompany || req.user.id !== firmId) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' })
+    }
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı ID' })
+    }
+
+    const messages = await db.all(
+      `SELECT id, userId, firmId, senderType, message, readByUser, readByFirm, createdAt
+       FROM user_chat_messages
+       WHERE userId = ? AND firmId = ?
+       ORDER BY createdAt ASC, id ASC
+       LIMIT 300`,
+      [userId, firmId]
+    )
+
+    await db.run(
+      `UPDATE user_chat_messages
+       SET readByFirm = 1
+       WHERE userId = ? AND firmId = ? AND senderType = 'user' AND readByFirm = 0`,
+      [userId, firmId]
+    )
+
+    res.json({ success: true, data: messages })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Server error' })
+  }
+})
+
+app.post('/api/firms/:firmId/chats/:userId/reply', authMiddleware, async (req, res) => {
+  try {
+    const firmId = Number(req.params.firmId)
+    const userId = Number(req.params.userId)
+    const message = String(req.body?.message || '').trim()
+
+    if (!req.user.isCompany || req.user.id !== firmId) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' })
+    }
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ success: false, error: 'Geçersiz kullanıcı ID' })
+    }
+
+    if (!message) {
+      return res.status(400).json({ success: false, error: 'Mesaj boş olamaz' })
+    }
+
+    const user = await db.get('SELECT id FROM users WHERE id = ?', [userId])
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' })
+    }
+
+    const insert = await db.run(
+      `INSERT INTO user_chat_messages
+       (userId, firmId, senderType, message, readByUser, readByFirm)
+       VALUES (?, ?, 'firm', ?, 0, 1)`,
+      [userId, firmId, message]
+    )
+
+    const row = await db.get('SELECT * FROM user_chat_messages WHERE id = ?', [insert.lastID])
+    res.status(201).json({ success: true, data: row })
+  } catch (error) {
     res.status(500).json({ success: false, error: 'Server error' })
   }
 })

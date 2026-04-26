@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import CompanyCard from './CompanyCard'
+import RouteMapPicker from './RouteMapPicker'
 import { API } from '../data'
 
 const HERO_IMAGES = [
@@ -61,6 +62,9 @@ export default function Home(){
   const [filteredToDistricts, setFilteredToDistricts] = useState([])
   const [showToDistricts, setShowToDistricts] = useState(false)
   const [moveDate, setMoveDate] = useState('')
+  const [moveTime, setMoveTime] = useState('09:00')
+  const [mapDistanceKm, setMapDistanceKm] = useState(0)
+  const [mapPickerOpen, setMapPickerOpen] = useState(false)
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [loadStatus, setLoadStatus] = useState('')
@@ -260,6 +264,16 @@ export default function Home(){
     listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const handleMapApply = (selection) => {
+    setCity(selection.fromCity || '')
+    setToCity(selection.toCity || '')
+    setMoveDate(selection.moveDate || '')
+    setMoveTime(selection.moveTime || '09:00')
+    setMapDistanceKm(Number(selection.distanceKm || 0))
+    setDistrict('')
+    setToDistrict('')
+  }
+
   return (
     <div className="home-page">
       <section className="home-hero">
@@ -440,6 +454,21 @@ export default function Home(){
               onChange={e => setMoveDate(e.target.value)}
             />
           </label>
+          <label>Taşıma Saati
+            <input
+              type="time"
+              value={moveTime}
+              onChange={e => setMoveTime(e.target.value)}
+            />
+          </label>
+          <button className="btn" type="button" onClick={() => setMapPickerOpen(true)}>
+            Haritadan Nereden/Nereye Seç
+          </button>
+          {mapDistanceKm > 0 && (
+            <p style={{ marginTop: '8px', color: '#475569', fontSize: '13px' }}>
+              Haritadan seçilen mesafe: <strong>{mapDistanceKm} km</strong>
+            </p>
+          )}
           <button className="search-btn" onClick={handleSearchScroll}>
             Sonuçlara Git
           </button>
@@ -468,6 +497,16 @@ export default function Home(){
           </div>
         </section>
       </div>
+
+      <RouteMapPicker
+        isOpen={mapPickerOpen}
+        onClose={() => setMapPickerOpen(false)}
+        onApply={handleMapApply}
+        initialFromCity={city}
+        initialToCity={toCity}
+        initialMoveDate={moveDate}
+        initialMoveTime={moveTime}
+      />
     </div>
   )
 }

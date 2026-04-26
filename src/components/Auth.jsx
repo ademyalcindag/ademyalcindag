@@ -15,6 +15,7 @@ export default function Auth(){
   const [accountType, setAccountType] = useState(null)
   const [pendingRegistration, setPendingRegistration] = useState(null)
   const [smsCode, setSmsCode] = useState('')
+  const [emailCode, setEmailCode] = useState('')
   const [userPhone, setUserPhone] = useState('')
   const [companyPhone, setCompanyPhone] = useState('')
   const [loginType, setLoginType] = useState(null) // user | company
@@ -72,6 +73,7 @@ export default function Auth(){
   function startRegister(){
     setPendingRegistration(null)
     setSmsCode('')
+    setEmailCode('')
     setUserPhone('')
     setCompanyPhone('')
     setMode('account-type')
@@ -80,6 +82,7 @@ export default function Auth(){
   function selectAccountType(type){
     setPendingRegistration(null)
     setSmsCode('')
+    setEmailCode('')
     setUserPhone('')
     setCompanyPhone('')
     setAccountType(type)
@@ -110,14 +113,21 @@ export default function Auth(){
       setPendingRegistration({
         pendingToken: res.pendingToken,
         smsAvailable: res.smsAvailable,
+        emailAvailable: res.emailAvailable,
         demoSmsCode: res.demoSmsCode,
+        demoEmailCode: res.demoEmailCode,
         email: obj.email,
         phone: obj.phone || '',
       })
       setSmsCode('')
+      setEmailCode('')
 
       if (res.demoSmsCode) {
         alert(`Demo SMS kodu: ${res.demoSmsCode}`)
+      }
+
+      if (res.demoEmailCode) {
+        alert(`Demo e-posta kodu: ${res.demoEmailCode}`)
       }
 
       return
@@ -199,13 +209,55 @@ export default function Auth(){
       return
     }
 
-    localStorage.setItem('userAuth', JSON.stringify(res.user))
-    if (res.token) localStorage.setItem('authToken', res.token)
-    setPendingRegistration(null)
-    setSmsCode('')
-    setMode('login')
-    setAccountType(null)
-    navigate('/')
+    if (res.completed) {
+      localStorage.setItem('userAuth', JSON.stringify(res.user))
+      if (res.token) localStorage.setItem('authToken', res.token)
+      setPendingRegistration(null)
+      setSmsCode('')
+      setEmailCode('')
+      setMode('login')
+      setAccountType(null)
+      navigate('/')
+      return
+    }
+
+    alert(res.message || 'SMS doğrulandı. E-posta kodunu da doğrulamanız gerekiyor.')
+  }
+
+  async function handleVerifyEmail(){
+    if (!pendingRegistration?.pendingToken) {
+      alert('Bekleyen kayıt bulunamadı. Lütfen tekrar deneyin.')
+      return
+    }
+
+    if (!emailCode.trim()) {
+      alert('E-posta kodunu girin')
+      return
+    }
+
+    const res = await API.verifyUserRegistrationEmail({
+      pendingToken: pendingRegistration.pendingToken,
+      emailCode: emailCode.trim(),
+    })
+
+    if (!res.ok) {
+      alert(res.error || 'E-posta doğrulaması başarısız')
+      return
+    }
+
+    if (res.completed) {
+      localStorage.setItem('userAuth', JSON.stringify(res.user))
+      if (res.token) localStorage.setItem('authToken', res.token)
+      setPendingRegistration(null)
+      setSmsCode('')
+      setEmailCode('')
+      setMode('login')
+      setAccountType(null)
+      navigate('/')
+      return
+    }
+
+    alert(res.message || 'E-posta doğrulandı. SMS kodunu da doğrulamanız gerekiyor.')
   }
 
   async function handleGoogleRegisterVerifySuccess(credentialResponse) {
@@ -222,13 +274,19 @@ export default function Auth(){
       return
     }
 
-    localStorage.setItem('userAuth', JSON.stringify(res.user))
-    if (res.token) localStorage.setItem('authToken', res.token)
-    setPendingRegistration(null)
-    setSmsCode('')
-    setMode('login')
-    setAccountType(null)
-    navigate('/')
+    if (res.completed) {
+      localStorage.setItem('userAuth', JSON.stringify(res.user))
+      if (res.token) localStorage.setItem('authToken', res.token)
+      setPendingRegistration(null)
+      setSmsCode('')
+      setEmailCode('')
+      setMode('login')
+      setAccountType(null)
+      navigate('/')
+      return
+    }
+
+    alert(res.message || 'Google doğrulaması tamamlandı. SMS doğrulamasını da tamamlayın.')
   }
 
   async function handleResendSms(){
@@ -397,6 +455,16 @@ export default function Auth(){
 
             {pendingRegistration.smsAvailable ? (
               <>
+                <label>E-posta Aktivasyon Kodu
+                  <input
+                    type="text"
+                    value={emailCode}
+                    onChange={(e)=>setEmailCode(e.target.value)}
+                    placeholder="6 haneli e-posta kodu"
+                  />
+                </label>
+                <button className="btn primary" type="button" style={{marginTop:'8px'}} onClick={handleVerifyEmail}>E-posta Kodunu Doğrula</button>
+
                 <label>SMS Kodu
                   <input
                     type="text"
@@ -409,34 +477,34 @@ export default function Auth(){
                   <button className="btn primary" type="button" style={{flex:1}} onClick={handleVerifySms}>SMS ile Doğrula</button>
                   <button className="btn" type="button" style={{flex:1}} onClick={handleResendSms}>Kodu Tekrar Gönder</button>
                 </div>
+
+                <div style={{textAlign:'center', marginTop:'14px', color:'#6b7280', fontSize:'13px'}}>veya Google ile e-posta doğrula:</div>
+                <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <GoogleLogin
+                    onSuccess={handleGoogleRegisterVerifySuccess}
+                    onError={() => {
+                      console.error('Google Doğrulama Başarısız')
+                      alert('Google doğrulama başarısız. Lütfen tekrar deneyin.')
+                    }}
+                    theme="filled_blue"
+                    text="continue_with"
+                    shape="rectangular"
+                    size="medium"
+                    locale="tr"
+                  />
+                </div>
               </>
             ) : (
               <div style={{fontSize:'13px', color:'#6b7280', marginBottom:'8px'}}>
-                Telefon girilmediği için SMS doğrulama kullanılamıyor. Google doğrulamayı kullanın.
+                Bu kayıt için SMS doğrulama zorunludur. Geçerli telefon numarası ile tekrar kayıt başlatın.
               </div>
             )}
-
-            <div style={{textAlign:'center', marginTop:'14px', color:'#6b7280', fontSize:'13px'}}>veya Google ile doğrula:</div>
-            <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-              <GoogleLogin
-                onSuccess={handleGoogleRegisterVerifySuccess}
-                onError={() => {
-                  console.error('Google Doğrulama Başarısız')
-                  alert('Google doğrulama başarısız. Lütfen tekrar deneyin.')
-                }}
-                theme="filled_blue"
-                text="continue_with"
-                shape="rectangular"
-                size="medium"
-                locale="tr"
-              />
-            </div>
 
             <button
               type="button"
               className="btn"
               style={{marginTop:'12px', width:'100%'}}
-              onClick={()=>{ setPendingRegistration(null); setSmsCode('') }}
+              onClick={()=>{ setPendingRegistration(null); setSmsCode(''); setEmailCode('') }}
             >
               Bilgileri Düzenle
             </button>
@@ -444,7 +512,7 @@ export default function Auth(){
               type="button"
               className="btn"
               style={{marginTop:'8px', width:'100%'}}
-              onClick={()=>{ setMode('account-type'); setAccountType(null); setPendingRegistration(null); setSmsCode('') }}
+              onClick={()=>{ setMode('account-type'); setAccountType(null); setPendingRegistration(null); setSmsCode(''); setEmailCode('') }}
             >
               Vazgeç
             </button>

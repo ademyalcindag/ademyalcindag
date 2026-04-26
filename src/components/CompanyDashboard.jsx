@@ -6,6 +6,9 @@ export default function CompanyDashboard(){
   const navigate = useNavigate()
   const [firm, setFirm] = useState(null)
   const [messages, setMessages] = useState([])
+  const [chatMessages, setChatMessages] = useState([])
+  const [selectedUserId, setSelectedUserId] = useState(null)
+  const [replyText, setReplyText] = useState('')
   const [prices, setPrices] = useState([])
   const [activeTab, setActiveTab] = useState('messages')
   const [editForm, setEditForm] = useState({})
@@ -28,8 +31,45 @@ export default function CompanyDashboard(){
       }
     })
     
-    API.fetchMessages(firmId).then(msgs => setMessages(msgs || []))
+    API.fetchFirmChatThreads(firmId).then((result) => {
+      if (result.ok) {
+        setMessages(result.data || [])
+        if (!selectedUserId && result.data?.length) {
+          setSelectedUserId(result.data[0].userId)
+        }
+      }
+    })
     API.fetchPrices(firmId).then(p => setPrices(p || []))
+  }
+
+  useEffect(() => {
+    if (!firm?.id || !selectedUserId) return
+
+    API.fetchFirmChatMessages(firm.id, selectedUserId).then((result) => {
+      if (result.ok) {
+        setChatMessages(result.data || [])
+      }
+    })
+  }, [firm?.id, selectedUserId])
+
+  const handleSendReply = async (e) => {
+    e.preventDefault()
+    if (!firm?.id || !selectedUserId || !replyText.trim()) return
+
+    const result = await API.sendFirmChatReply(firm.id, selectedUserId, replyText.trim())
+    if (!result.ok) {
+      alert(result.error || 'Yanıt gönderilemedi')
+      return
+    }
+
+    setReplyText('')
+    const [threadsResult, chatResult] = await Promise.all([
+      API.fetchFirmChatThreads(firm.id),
+      API.fetchFirmChatMessages(firm.id, selectedUserId),
+    ])
+
+    if (threadsResult.ok) setMessages(threadsResult.data || [])
+    if (chatResult.ok) setChatMessages(chatResult.data || [])
   }
 
   const handleLogout = () => {
@@ -125,18 +165,74 @@ export default function CompanyDashboard(){
       {/* MESAJLAR */}
       {activeTab === 'messages' && (
         <div style={{background:'white',padding:'20px',borderRadius:'10px',boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
-          <h2 style={{color:'#450ef3'}}>Gelen Mesajlar</h2>
+          <h2 style={{color:'#450ef3'}}>Sohbetler</h2>
           {messages.length > 0 ? (
-            <div>
-              {messages.map(msg => (
-                <div key={msg.id} style={{padding:'15px',borderBottom:'1px solid #eee',background:'#f9f9f9',marginBottom:'10px',borderRadius:'5px'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:'10px'}}>
-                    <strong style={{color:'#450ef3'}}>{msg.fromUser}</strong>
-                    <small style={{color:'#999'}}>{new Date(msg.createdAt).toLocaleDateString('tr-TR')}</small>
-                  </div>
-                  <p style={{margin:'0'}}>{msg.content}</p>
+            <div style={{display:'grid',gridTemplateColumns:'280px 1fr',gap:'16px'}}>
+              <div>
+                {messages.map(msg => (
+                  <button
+                    key={msg.userId}
+                    type="button"
+                    onClick={() => setSelectedUserId(msg.userId)}
+                    style={{
+                      width:'100%',
+                      textAlign:'left',
+                      padding:'12px',
+                      border:'1px solid #ddd',
+                      borderRadius:'8px',
+                      background:selectedUserId===msg.userId ? '#eef2ff' : '#f9f9f9',
+                      marginBottom:'10px',
+                      cursor:'pointer'
+                    }}
+                  >
+                    <strong style={{display:'block', color:'#312e81'}}>{msg.userName}</strong>
+                    <span style={{display:'block', color:'#475569', fontSize:'13px', marginTop:'4px'}}>{msg.lastMessage}</span>
+                    <small style={{color:'#64748b'}}>{new Date(msg.lastMessageAt).toLocaleString('tr-TR')}</small>
+                    {Number(msg.unreadCount || 0) > 0 && (
+                      <span style={{display:'inline-block', marginLeft:'8px', color:'#dc2626', fontWeight:700, fontSize:'12px'}}>
+                        {msg.unreadCount} yeni
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px', minHeight:'280px'}}>
+                <div style={{display:'flex', flexDirection:'column', gap:'8px', maxHeight:'320px', overflowY:'auto', paddingBottom:'8px'}}>
+                  {chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      style={{
+                        maxWidth:'80%',
+                        alignSelf: msg.senderType === 'firm' ? 'flex-end' : 'flex-start',
+                        background: msg.senderType === 'firm' ? '#dbeafe' : '#f1f5f9',
+                        borderRadius:'10px',
+                        padding:'10px'
+                      }}
+                    >
+                      <p style={{margin:'0 0 6px 0'}}>{msg.message}</p>
+                      <small style={{color:'#64748b'}}>{new Date(msg.createdAt).toLocaleString('tr-TR')}</small>
+                    </div>
+                  ))}
                 </div>
-              ))}
+
+                <form onSubmit={handleSendReply} style={{display:'flex', gap:'8px', marginTop:'12px'}}>
+                  <input
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder={selectedUserId ? 'Yanıt yazın...' : 'Önce bir sohbet seçin'}
+                    disabled={!selectedUserId}
+                    style={{flex:1, padding:'10px', border:'1px solid #cbd5e1', borderRadius:'8px'}}
+                  />
+                  <button
+                    type="submit"
+                    className="btn primary"
+                    disabled={!selectedUserId || !replyText.trim()}
+                  >
+                    Yanıtla
+                  </button>
+                </form>
+              </div>
             </div>
           ) : (
             <p style={{color:'#999'}}>Henüz mesaj yok</p>

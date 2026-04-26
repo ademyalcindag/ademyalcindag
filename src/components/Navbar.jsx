@@ -40,6 +40,7 @@ export default function Navbar(){
   const handleLogout = () => {
     localStorage.removeItem('userAuth')
     localStorage.removeItem('companyAuth')
+    localStorage.removeItem('authToken')
     window.location.href = '/' // Sayfayı yenileyerek state'i temizle
   }
 
@@ -67,7 +68,7 @@ export default function Navbar(){
               {auth.company ? (
                 <Link to="/company/dashboard" className="btn">Panelim</Link>
               ) : (
-                <span className="user-name">Merhaba, {auth.user.name}</span>
+                <Link to="/account" className="btn">{auth.user.name}</Link>
               )}
               <button onClick={handleLogout} className="btn outline" style={{ padding: '5px 10px', fontSize: '13px' }}>Çıkış</button>
             </div>

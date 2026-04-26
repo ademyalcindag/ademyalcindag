@@ -102,8 +102,30 @@ export const API = {
           ok: true,
           pendingToken: parsed.raw?.pendingToken,
           smsAvailable: Boolean(parsed.raw?.smsAvailable),
+          emailAvailable: Boolean(parsed.raw?.emailAvailable),
           demoSmsCode: parsed.raw?.demoSmsCode,
+          demoEmailCode: parsed.raw?.demoEmailCode,
           expiresInMinutes: parsed.raw?.expiresInMinutes,
+        }
+      : { ok: false, error: parsed.error }
+  },
+
+  async verifyUserRegistrationEmail(payload) {
+    const res = await fetch(buildUrl('/api/register/verify-email'), {
+      method: 'POST',
+      headers: jsonHeaders(false),
+      body: JSON.stringify(payload),
+    })
+    const parsed = await parseJsonResponse(res)
+
+    return parsed.ok
+      ? {
+          ok: true,
+          completed: Boolean(parsed.raw?.completed),
+          nextStep: parsed.raw?.nextStep,
+          message: parsed.raw?.message,
+          user: parsed.raw?.user,
+          token: parsed.raw?.token,
         }
       : { ok: false, error: parsed.error }
   },
@@ -130,7 +152,14 @@ export const API = {
     const parsed = await parseJsonResponse(res)
 
     return parsed.ok
-      ? { ok: true, user: parsed.raw?.user, token: parsed.raw?.token }
+      ? {
+          ok: true,
+          completed: Boolean(parsed.raw?.completed),
+          nextStep: parsed.raw?.nextStep,
+          message: parsed.raw?.message,
+          user: parsed.raw?.user,
+          token: parsed.raw?.token,
+        }
       : { ok: false, error: parsed.error }
   },
 
@@ -143,8 +172,85 @@ export const API = {
     const parsed = await parseJsonResponse(res)
 
     return parsed.ok
-      ? { ok: true, user: parsed.raw?.user, token: parsed.raw?.token }
+      ? {
+          ok: true,
+          completed: Boolean(parsed.raw?.completed),
+          nextStep: parsed.raw?.nextStep,
+          message: parsed.raw?.message,
+          user: parsed.raw?.user,
+          token: parsed.raw?.token,
+        }
       : { ok: false, error: parsed.error }
+  },
+
+  async getMyProfile() {
+    const res = await fetch(buildUrl('/api/users/me'), {
+      headers: jsonHeaders(true),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, user: parsed.raw?.data } : { ok: false, error: parsed.error }
+  },
+
+  async updateMyProfile(payload) {
+    const res = await fetch(buildUrl('/api/users/me'), {
+      method: 'PUT',
+      headers: jsonHeaders(true),
+      body: JSON.stringify(payload),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, user: parsed.raw?.data } : { ok: false, error: parsed.error }
+  },
+
+  async fetchUserChatThreads() {
+    const res = await fetch(buildUrl('/api/user/chats'), {
+      headers: jsonHeaders(true),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, data: parsed.raw?.data || [] } : { ok: false, error: parsed.error }
+  },
+
+  async fetchUserChatMessages(firmId) {
+    const res = await fetch(buildUrl(`/api/user/chats/${firmId}`), {
+      headers: jsonHeaders(true),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, data: parsed.raw?.data || [] } : { ok: false, error: parsed.error }
+  },
+
+  async sendUserChatMessage(firmId, message) {
+    const res = await fetch(buildUrl(`/api/user/chats/${firmId}`), {
+      method: 'POST',
+      headers: jsonHeaders(true),
+      body: JSON.stringify({ message }),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, data: parsed.raw?.data } : { ok: false, error: parsed.error }
+  },
+
+  async fetchFirmChatThreads(firmId) {
+    const res = await fetch(buildUrl(`/api/firms/${firmId}/chats`), {
+      headers: jsonHeaders(true),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, data: parsed.raw?.data || [] } : { ok: false, error: parsed.error }
+  },
+
+  async fetchFirmChatMessages(firmId, userId) {
+    const res = await fetch(buildUrl(`/api/firms/${firmId}/chats/${userId}`), {
+      headers: jsonHeaders(true),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, data: parsed.raw?.data || [] } : { ok: false, error: parsed.error }
+  },
+
+  async sendFirmChatReply(firmId, userId, message) {
+    const res = await fetch(buildUrl(`/api/firms/${firmId}/chats/${userId}/reply`), {
+      method: 'POST',
+      headers: jsonHeaders(true),
+      body: JSON.stringify({ message }),
+    })
+    const parsed = await parseJsonResponse(res)
+    return parsed.ok ? { ok: true, data: parsed.raw?.data } : { ok: false, error: parsed.error }
   },
 
   async login(identifier, password) {

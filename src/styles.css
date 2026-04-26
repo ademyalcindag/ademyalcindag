@@ -120,6 +120,45 @@ main{flex:1}
 .campaign-card h4{margin:0 0 6px 0;color:var(--primary);font-size:15px}
 .campaign-card p{margin:0;color:#6b7280;font-size:14px}
 
+.account-page{align-items:flex-start}
+.account-card{background:#fff;border-radius:12px;padding:18px;border:1px solid #e2e8f0;box-shadow:0 8px 18px rgba(15,23,42,.08);width:100%}
+.account-page .account-card:first-child{max-width:360px}
+.account-chat-card{flex:1}
+.account-subtitle{margin:0 0 12px 0;color:#475569}
+.account-chat-layout{display:grid;grid-template-columns:300px 1fr;gap:14px}
+.chat-thread-list{display:flex;flex-direction:column;gap:8px;max-height:520px;overflow:auto}
+.chat-thread-item{border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:10px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.chat-thread-item.active{border-color:#450ef3;background:#eef2ff}
+.chat-thread-item strong{color:#1e1b4b}
+.chat-thread-item span{font-size:13px;color:#475569}
+.chat-thread-item small{font-size:12px;color:#64748b}
+.chat-thread-item em{font-style:normal;color:#dc2626;font-size:12px;font-weight:700}
+.chat-detail{display:flex;flex-direction:column;border:1px solid #e2e8f0;border-radius:10px;min-height:420px}
+.chat-detail-head{padding:12px;border-bottom:1px solid #e2e8f0;background:#f8fafc}
+.chat-messages{flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:380px}
+.chat-bubble{max-width:78%;padding:10px;border-radius:10px}
+.chat-bubble.mine{align-self:flex-end;background:#dbeafe}
+.chat-bubble.theirs{align-self:flex-start;background:#f1f5f9}
+.chat-bubble p{margin:0 0 4px 0;color:#0f172a}
+.chat-bubble small{font-size:12px;color:#64748b}
+.chat-send-form{display:flex;gap:8px;padding:12px;border-top:1px solid #e2e8f0}
+.chat-send-form input{flex:1;padding:10px;border:1px solid #cbd5e1;border-radius:8px}
+
+.map-picker-overlay{position:fixed;inset:0;background:rgba(2,6,23,.55);display:flex;justify-content:center;align-items:center;z-index:2200;padding:14px}
+.map-picker-card{width:min(980px,100%);background:#fff;border-radius:14px;padding:14px;box-shadow:0 20px 45px rgba(15,23,42,.35)}
+.map-picker-header{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.map-picker-header h4{margin:0;color:#1e1b4b}
+.map-picker-step{margin:8px 0 12px 0;color:#334155}
+.map-datetime-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.map-date-field input{margin-top:6px;width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px}
+.map-picker-target-toggle{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.map-picker-preview{display:flex;flex-direction:column;gap:4px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px}
+.map-picker-map{height:420px;border-radius:10px;overflow:hidden;border:1px solid #cbd5e1}
+.route-options{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.route-option{padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:13px}
+.route-option.active{border-color:#4338ca;background:#eef2ff}
+.map-picker-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+
 .site-footer{margin-top:28px;background:linear-gradient(90deg,#450ef3cc,#f3450ecc);border-top:2px solid #f3450e;color:white}
 .site-footer-inner{width:calc(100% - (var(--page-inline) * 2));margin:0 auto;padding:20px 0;display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:18px}
 .footer-column h4{margin:0 0 10px 0;font-size:14px;font-weight:700}
@@ -173,6 +212,11 @@ main{flex:1}
 	.home-highlights{width:calc(100% - (var(--page-inline) * 2));grid-template-columns:1fr}
 	.container.home-content{width:calc(100% - (var(--page-inline) * 2));grid-template-columns:1fr}
 	.container.home-content .filters{position:static}
+	.account-page{flex-direction:column}
+	.account-page .account-card:first-child{max-width:none}
+	.account-chat-layout{grid-template-columns:1fr}
+	.map-datetime-row{grid-template-columns:1fr}
+	.map-picker-map{height:320px}
 	.site-footer-inner{grid-template-columns:1fr;text-align:center}
 	.footer-brand-row{justify-content:center}
 	.footer-text{max-width:none}

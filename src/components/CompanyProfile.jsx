@@ -51,13 +51,15 @@ export default function CompanyProfile(){
               <button className="btn primary" onClick={async ()=>{
                 const content = messageText
                 const auth = JSON.parse(localStorage.getItem('userAuth') || 'null')
-                const result = await API.sendMessage({
-                  firmId: firm.id,
-                  senderId: auth?.id,
-                  senderName: auth?.name || 'Anonim',
-                  senderEmail: auth?.email || 'unknown@example.com',
-                  message: content,
-                })
+                const result = auth?.id
+                  ? await API.sendUserChatMessage(firm.id, content)
+                  : await API.sendMessage({
+                      firmId: firm.id,
+                      senderId: auth?.id,
+                      senderName: auth?.name || 'Anonim',
+                      senderEmail: auth?.email || 'unknown@example.com',
+                      message: content,
+                    })
                 if (!result.ok) {
                   alert(result.error || 'Mesaj gönderilemedi')
                   return

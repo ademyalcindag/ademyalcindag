@@ -27,11 +27,8 @@ VITE_API_URL=https://www.tasimacilikrehberi.com
 VITE_CANONICAL_HOST=www.tasimacilikrehberi.com
 CORS_ORIGINS=https://www.tasimacilikrehberi.com,https://tasimacilikrehberi.com
 
-SMS_PROVIDER=twilio
+SMS_PROVIDER=disabled
 SMS_DEFAULT_COUNTRY_CODE=+90
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_FROM_NUMBER=+1xxxxxxxxxx
 
 EMAIL_PROVIDER=resend
 EMAIL_FROM=no-reply@tasimacilikrehberi.com
@@ -64,12 +61,9 @@ Canlı ortamda şu senaryoları tek tek kontrol et:
 1. Kişi hesabı normal kayıt formu açılıyor.
 2. Kişi hesabı Google ile kayıt butonu görünüyor.
 3. Kayıt başlatıldığında e-posta aktivasyon maili gerçekten geliyor.
-4. SMS doğrulama kodu gerçekten telefona geliyor.
-5. E-posta doğrulama çalışıyor.
-6. SMS doğrulama çalışıyor.
-7. Her iki doğrulama bitmeden hesap açılmıyor.
-8. Google ile e-posta doğrulama çalışıyor.
-9. Kayıt sonrası giriş yapılabiliyor.
+4. E-posta doğrulama çalışıyor.
+5. Google ile e-posta doğrulama çalışıyor.
+6. Kayıt sonrası giriş yapılabiliyor.
 
 ## 6. Uygulama Smoke Test
 
@@ -82,7 +76,6 @@ Canlı ortamda şu senaryoları tek tek kontrol et:
 
 ## 7. Hata Durumları
 
-- Eğer uygulama production'da `SMS_PROVIDER=mock` veya `EMAIL_PROVIDER=mock` ile açılırsa backend artık bilerek ayağa kalkmaz.
+- Eğer uygulama production'da `EMAIL_PROVIDER=mock` ile açılırsa backend artık bilerek ayağa kalkmaz.
 - Eğer Google popup açılmazsa önce origin ayarını ve `VITE_GOOGLE_CLIENT_ID` değerini kontrol et.
-- Eğer SMS gitmezse önce Twilio loglarını ve gönderici numaranın yetkili olup olmadığını kontrol et.
 - Eğer mail gitmezse önce Resend domain doğrulamasını ve `EMAIL_FROM` adresini kontrol et.

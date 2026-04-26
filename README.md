@@ -87,10 +87,7 @@ Bu komut otomatik olarak build yapar ve Hostinger için hazırlar.
    VITE_GOOGLE_CLIENT_ID=your-google-client-id
    CORS_ORIGINS=https://www.tasimacilikrehberi.com,https://tasimacilikrehberi.com
    VITE_API_URL=https://www.tasimacilikrehberi.com
-   SMS_PROVIDER=twilio
-   TWILIO_ACCOUNT_SID=your-twilio-sid
-   TWILIO_AUTH_TOKEN=your-twilio-auth-token
-   TWILIO_FROM_NUMBER=your-twilio-from-number
+   SMS_PROVIDER=disabled
    EMAIL_PROVIDER=resend
    EMAIL_FROM=no-reply@tasimacilikrehberi.com
    RESEND_API_KEY=your-resend-api-key

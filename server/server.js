@@ -101,7 +101,7 @@ const SALT_ROUNDS = 10
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '703001786924-b09c4sm9kpsbpj8t9leallsunng4j9h1.apps.googleusercontent.com'
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID)
 const REGISTER_OTP_EXPIRES_MINUTES = 10
-const SMS_PROVIDER = String(process.env.SMS_PROVIDER || (IS_PRODUCTION ? 'twilio' : 'mock')).trim().toLowerCase()
+const SMS_PROVIDER = String(process.env.SMS_PROVIDER || (IS_PRODUCTION ? 'disabled' : 'mock')).trim().toLowerCase()
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || ''
@@ -113,10 +113,6 @@ const EMAIL_FROM = process.env.EMAIL_FROM || 'no-reply@tasimacilikrehberi.com'
 let db
 
 function validateRuntimeConfig() {
-  if (IS_PRODUCTION && SMS_PROVIDER === 'mock') {
-    throw new Error('Production ortaminda SMS_PROVIDER=mock kullanilamaz. Gercek bir SMS saglayicisi tanimlayin.')
-  }
-
   if (IS_PRODUCTION && EMAIL_PROVIDER === 'mock') {
     throw new Error('Production ortaminda EMAIL_PROVIDER=mock kullanilamaz. Gercek bir e-posta saglayicisi tanimlayin.')
   }
@@ -409,6 +405,10 @@ function isValidTurkeyPhone(phone) {
 }
 
 async function sendVerificationSms(phone, code) {
+  if (SMS_PROVIDER === 'disabled') {
+    throw new Error('SMS doğrulama bu ortamda kapalı')
+  }
+
   const normalizedPhone = normalizePhoneForSms(phone)
   if (!normalizedPhone) {
     throw new Error('Telefon numarası doğrulama için uygun formatta değil')
@@ -537,7 +537,7 @@ async function completePendingUserRegistration(pending, verificationMethod) {
 }
 
 async function tryCompletePendingRegistration(pending) {
-  if (!pending?.emailVerified || !pending?.smsVerified) {
+  if (!pending?.emailVerified) {
     return null
   }
 
@@ -590,12 +590,13 @@ app.post('/api/register/start-user', async (req, res) => {
   try {
     const { name, email, phone, password, confirmPassword } = req.body
     const normalizedEmail = normalizeEmail(email)
+    const normalizedPhone = String(phone || '').trim() || null
 
-    if (!name || !normalizedEmail || !password || !phone) {
+    if (!name || !normalizedEmail || !password) {
       return res.status(400).json({ success: false, error: 'Eksik alanı doldurunuz' })
     }
 
-    if (!isValidTurkeyPhone(phone)) {
+    if (normalizedPhone && !isValidTurkeyPhone(normalizedPhone)) {
       return res.status(400).json({ success: false, error: 'Eksik alanı doldurunuz' })
     }
 
@@ -615,7 +616,6 @@ app.post('/api/register/start-user', async (req, res) => {
     await db.run('DELETE FROM pending_registrations WHERE email = ?', [normalizedEmail])
 
     const pendingToken = createPendingToken()
-    const smsCode = createOtpCode()
     const emailCode = createOtpCode()
     const passwordHash = await hashPassword(password)
     const expiresAt = expiresAtIso(REGISTER_OTP_EXPIRES_MINUTES)
@@ -623,7 +623,7 @@ app.post('/api/register/start-user', async (req, res) => {
     const payload = JSON.stringify({
       name: String(name).trim(),
       email: normalizedEmail,
-      phone: (phone || '').trim() || null,
+      phone: normalizedPhone,
       passwordHash,
     })
 
@@ -631,13 +631,8 @@ app.post('/api/register/start-user', async (req, res) => {
       `INSERT INTO pending_registrations
        (token, accountType, email, phone, payload, emailCode, emailVerified, smsCode, smsVerified, smsSentAt, expiresAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, 0, ?, 0, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)`,
-      [pendingToken, 'user', normalizedEmail, (phone || '').trim() || null, payload, emailCode, smsCode, expiresAt]
+      [pendingToken, 'user', normalizedEmail, normalizedPhone, payload, emailCode, null, expiresAt]
     )
-
-    let smsResult = null
-    if ((phone || '').trim()) {
-      smsResult = await sendVerificationSms(phone, smsCode)
-    }
 
     const emailResult = await sendActivationEmail(normalizedEmail, emailCode, String(name || '').trim())
 
@@ -645,11 +640,10 @@ app.post('/api/register/start-user', async (req, res) => {
       success: true,
       pendingToken,
       expiresInMinutes: REGISTER_OTP_EXPIRES_MINUTES,
-      smsAvailable: Boolean((phone || '').trim()),
+      smsAvailable: false,
       emailAvailable: Boolean(normalizedEmail),
-      smsProvider: smsResult?.provider || SMS_PROVIDER,
       emailProvider: emailResult?.provider || EMAIL_PROVIDER,
-      message: 'Kayit baslatildi. E-posta ve SMS kodlarini dogrulayarak kaydi tamamlayin.',
+      message: 'Kayit baslatildi. E-posta aktivasyonu veya Google ile kaydi tamamlayin.',
     })
   } catch (error) {
     console.error('Start register error:', error)
@@ -698,7 +692,7 @@ app.post('/api/register/verify-email', async (req, res) => {
       return res.json({
         success: true,
         completed: true,
-        message: 'E-posta ve SMS doğrulaması tamamlandı, kayıt oluşturuldu',
+        message: 'E-posta doğrulaması tamamlandı, kayıt oluşturuldu',
         user: completed.user,
         token: completed.token,
       })
@@ -707,8 +701,8 @@ app.post('/api/register/verify-email', async (req, res) => {
     res.json({
       success: true,
       completed: false,
-      nextStep: 'sms',
-      message: 'E-posta doğrulandı. Kayıt tamamlamak için SMS doğrulamasını tamamlayın.',
+      nextStep: 'completed',
+      message: 'E-posta doğrulandı.',
     })
   } catch (error) {
     if (error.message === 'Bu email zaten kayıtlı') {
@@ -881,7 +875,7 @@ app.post('/api/register/verify-google', async (req, res) => {
       return res.json({
         success: true,
         completed: true,
-        message: 'Google ve SMS doğrulaması tamamlandı, kayıt oluşturuldu',
+        message: 'Google doğrulaması tamamlandı, kayıt oluşturuldu',
         user: completed.user,
         token: completed.token,
       })
@@ -890,8 +884,8 @@ app.post('/api/register/verify-google', async (req, res) => {
     res.json({
       success: true,
       completed: false,
-      nextStep: 'sms',
-      message: 'Google doğrulaması tamamlandı. Kayıt tamamlamak için SMS doğrulamasını tamamlayın.',
+      nextStep: 'completed',
+      message: 'Google doğrulaması tamamlandı.',
     })
   } catch (error) {
     if (error.message === 'Bu email zaten kayıtlı') {

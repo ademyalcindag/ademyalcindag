@@ -47,16 +47,13 @@ Bu dosyadaki değerleri kullan:
 
 Buradaki satırları Hostinger panelindeki Environment Variables bölümüne tek tek ekle.
 
-## 5. Senin Yerine Dolduramadığım 4 Alan
+## 5. Senin Yerine Dolduramadığım 1 Alan
 
 Bunlar dış servis hesabı istediği için sadece sende olabilir:
 
-1. `TWILIO_ACCOUNT_SID`
-2. `TWILIO_AUTH_TOKEN`
-3. `TWILIO_FROM_NUMBER`
-4. `RESEND_API_KEY`
+1. `RESEND_API_KEY`
 
-Bu 4 değer olmadan canlı SMS ve canlı e-posta çalışmaz.
+Bu değer olmadan canlı e-posta aktivasyonu çalışmaz.
 
 ## 6. Google Tarafında Olması Gerekenler
 
@@ -74,21 +71,17 @@ https://tasimacilikrehberi.com
 1. Kişi hesabı kayıt ekranı açılıyor.
 2. Google ile kayıt butonu görünüyor.
 3. E-posta aktivasyon maili geliyor.
-4. SMS kodu geliyor.
-5. Kayıt tamamlanıyor.
-6. Hesabım ekranı açılıyor.
-7. Mesajlaşma çalışıyor.
-8. Haritadan rota seçimi çalışıyor.
+4. Kayıt tamamlanıyor.
+5. Hesabım ekranı açılıyor.
+6. Mesajlaşma çalışıyor.
+7. Haritadan rota seçimi çalışıyor.
 
 ## 8. En Kısa Gerçek Durum
 
 Kod tarafında gereken hazırlık bitti.
 
-Sadece şu 4 canlı servis bilgisini yerine koyman gerekiyor:
+Sadece şu 1 canlı servis bilgisini yerine koyman gerekiyor:
 
-- Twilio SID
-- Twilio token
-- Twilio gönderici numarası
 - Resend API key
 
-Bunları verdiğin anda sistem canlı doğrulama ile çalışacak.
+Bunu verdiğin anda sistem canlı doğrulama ile çalışacak.

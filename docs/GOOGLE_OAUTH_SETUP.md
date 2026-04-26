@@ -132,32 +132,24 @@ pm2 logs tasimacilik
 
 ---
 
-## Yeni Kayıt Doğrulama (E-posta + SMS)
+## Yeni Kayıt Doğrulama (E-posta veya Google)
 
-Kullanıcı kaydında artık iki adım zorunlu:
+Kullanıcı kaydı artık şu yöntemlerden biriyle tamamlanır:
 
 1. E-posta aktivasyon kodu
-2. SMS doğrulama kodu
+2. Google doğrulaması
 
 Backend endpointleri:
 
 - `POST /api/register/start-user`
 - `POST /api/register/verify-email`
-- `POST /api/register/verify-sms`
-- `POST /api/register/resend-sms`
+- `POST /api/register/verify-google`
 
 ### Environment Variables
 
 `.env` dosyasına aşağıdaki alanları ekle:
 
 ```bash
-# SMS
-SMS_PROVIDER=twilio
-SMS_DEFAULT_COUNTRY_CODE=+90
-TWILIO_ACCOUNT_SID=...
-TWILIO_AUTH_TOKEN=...
-TWILIO_FROM_NUMBER=+1...
-
 # E-posta
 EMAIL_PROVIDER=resend
 EMAIL_FROM=no-reply@tasimacilikrehberi.com
@@ -166,5 +158,5 @@ RESEND_API_KEY=re_...
 
 ### Test Notu
 
-- Production ortamında `mock` sağlayıcı kullanımı kapatıldı.
-- Canlı sitede Twilio ve Resend bilgileri tanımlı değilse kayıt servisi ayağa kalkmaz.
+- Production ortamında kullanıcı kaydı için e-posta aktivasyonu veya Google doğrulaması kullanılır.
+- Canlı sitede Resend bilgileri tanımlı değilse e-posta aktivasyonu çalışmaz.

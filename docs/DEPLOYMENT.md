@@ -49,10 +49,7 @@ En az şu değerleri güncelle:
   ```
   VITE_API_URL=https://www.senin-domainini.com
   ```
-- `SMS_PROVIDER=twilio`
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_FROM_NUMBER`
+- `SMS_PROVIDER=disabled`
 - `EMAIL_PROVIDER=resend`
 - `EMAIL_FROM`
 - `RESEND_API_KEY`
@@ -96,13 +93,12 @@ Aşağıdakileri canlı ortamda kontrol et:
 1. ✅ **Google ile görüş** - "Google ile Kayıt Ol" / "Google ile Giriş Yap" çalışıyor
 2. ✅ Kullanıcı kayıt (email + şifre)
 3. ✅ E-posta aktivasyon maili geliyor
-4. ✅ SMS doğrulama kodu geliyor
-3. ✅ Kullanıcı giriş
-4. ✅ Firma kayıt
-5. ✅ Firma giriş
-6. ✅ Mesaj gönderme
-7. ✅ Firma panelinde fiyat ekle/sil
-8. ✅ Firma panelinde fotoğraf yükle
+4. ✅ Kullanıcı giriş
+5. ✅ Firma kayıt
+6. ✅ Firma giriş
+7. ✅ Mesaj gönderme
+8. ✅ Firma panelinde fiyat ekle/sil
+9. ✅ Firma panelinde fotoğraf yükle
 
 ## 8) APK dağıtımı
 

@@ -97,12 +97,12 @@ export default function Auth(){
     if(accountType === 'user') {
       obj.type = 'user'
 
-      if (sanitizePhoneDigits(obj.phone).length !== 11) {
-        alert('Eksik alanı doldurunuz')
+      if (obj.phone && sanitizePhoneDigits(obj.phone).length !== 11) {
+        alert('Telefon numarası eksik veya hatalı')
         return
       }
 
-      obj.phone = toTurkeyE164(obj.phone)
+      obj.phone = obj.phone ? toTurkeyE164(obj.phone) : ''
 
       const res = await API.startUserRegistration(obj)
       if (!res.ok) {
@@ -112,7 +112,6 @@ export default function Auth(){
 
       setPendingRegistration({
         pendingToken: res.pendingToken,
-        smsAvailable: res.smsAvailable,
         emailAvailable: res.emailAvailable,
         email: obj.email,
         phone: obj.phone || '',
@@ -211,7 +210,7 @@ export default function Auth(){
       return
     }
 
-    alert(res.message || 'SMS doğrulandı. E-posta kodunu da doğrulamanız gerekiyor.')
+    alert(res.message || 'Doğrulama tamamlandı.')
   }
 
   async function handleVerifyEmail(){
@@ -247,7 +246,7 @@ export default function Auth(){
       return
     }
 
-    alert(res.message || 'E-posta doğrulandı. SMS kodunu da doğrulamanız gerekiyor.')
+    alert(res.message || 'E-posta doğrulandı.')
   }
 
   async function handleGoogleRegisterVerifySuccess(credentialResponse) {
@@ -276,7 +275,7 @@ export default function Auth(){
       return
     }
 
-    alert(res.message || 'Google doğrulaması tamamlandı. SMS doğrulamasını da tamamlayın.')
+    alert(res.message || 'Google doğrulaması tamamlandı.')
   }
 
   async function handleResendSms(){
@@ -400,7 +399,7 @@ export default function Auth(){
             <h3 style={{marginTop:0, color:'var(--primary)'}}>Kişi Hesabı Oluştur</h3>
             <label>Ad Soyad<input name="name" required /></label>
             <label>E-posta<input type="email" name="email" required /></label>
-            <label>Telefon</label>
+            <label>Telefon (isteğe bağlı)</label>
             <div style={{display:'flex', alignItems:'center', gap:'8px', border:'1px solid #d1d5db', borderRadius:'8px', padding:'8px 10px', marginBottom:'8px'}}>
               <span style={{color:'#111827', fontWeight:600}}>+90</span>
               <input
@@ -409,7 +408,6 @@ export default function Auth(){
                 inputMode="numeric"
                 pattern="[0-9]{11}"
                 maxLength={11}
-                required
                 placeholder="0XXXXXXXXXX"
                 value={userPhone}
                 onChange={(e)=>setUserPhone(sanitizePhoneDigits(e.target.value))}
@@ -422,7 +420,7 @@ export default function Auth(){
               <button type="button" className="btn" style={{flex:1}} onClick={()=>{setMode('account-type'); setAccountType(null)}}>Geri</button>
             </div>
             <div style={{marginTop:'12px', fontSize:'13px', color:'#6b7280'}}>
-              Kayıt tamamlamak için bir sonraki adımda Google veya SMS kodu ile doğrulama yapacaksınız.
+              Kayıt tamamlamak için bir sonraki adımda e-posta aktivasyonu veya Google doğrulaması yapacaksınız.
             </div>
 
             <div style={{textAlign:'center', marginTop:'10px', color:'#6b7280', fontSize:'13px'}}>Veya Google ile kayıt olun:</div>
@@ -447,55 +445,34 @@ export default function Auth(){
           <div className="form">
             <h3 style={{marginTop:0, color:'var(--primary)'}}>Kayıt Doğrulama</h3>
             <p style={{marginTop:0, color:'#4b5563', fontSize:'14px'}}>
-              <strong>{pendingRegistration.email}</strong> için kayıt başlatıldı. Aşağıdaki yöntemlerden biriyle doğrulayıp kaydı tamamlayın.
+              <strong>{pendingRegistration.email}</strong> için kayıt başlatıldı. E-posta kodu veya Google doğrulaması ile kaydı tamamlayın.
             </p>
 
-            {pendingRegistration.smsAvailable ? (
-              <>
-                <label>E-posta Aktivasyon Kodu
-                  <input
-                    type="text"
-                    value={emailCode}
-                    onChange={(e)=>setEmailCode(e.target.value)}
-                    placeholder="6 haneli e-posta kodu"
-                  />
-                </label>
-                <button className="btn primary" type="button" style={{marginTop:'8px'}} onClick={handleVerifyEmail}>E-posta Kodunu Doğrula</button>
+            <label>E-posta Aktivasyon Kodu
+              <input
+                type="text"
+                value={emailCode}
+                onChange={(e)=>setEmailCode(e.target.value)}
+                placeholder="6 haneli e-posta kodu"
+              />
+            </label>
+            <button className="btn primary" type="button" style={{marginTop:'8px'}} onClick={handleVerifyEmail}>E-posta Kodunu Doğrula</button>
 
-                <label>SMS Kodu
-                  <input
-                    type="text"
-                    value={smsCode}
-                    onChange={(e)=>setSmsCode(e.target.value)}
-                    placeholder="6 haneli kod"
-                  />
-                </label>
-                <div style={{display:'flex', gap:'8px', marginTop:'8px'}}>
-                  <button className="btn primary" type="button" style={{flex:1}} onClick={handleVerifySms}>SMS ile Doğrula</button>
-                  <button className="btn" type="button" style={{flex:1}} onClick={handleResendSms}>Kodu Tekrar Gönder</button>
-                </div>
-
-                <div style={{textAlign:'center', marginTop:'14px', color:'#6b7280', fontSize:'13px'}}>veya Google ile e-posta doğrula:</div>
-                <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                  <GoogleLogin
-                    onSuccess={handleGoogleRegisterVerifySuccess}
-                    onError={() => {
-                      console.error('Google Doğrulama Başarısız')
-                      alert('Google doğrulama başarısız. Lütfen tekrar deneyin.')
-                    }}
-                    theme="filled_blue"
-                    text="continue_with"
-                    shape="rectangular"
-                    size="medium"
-                    locale="tr"
-                  />
-                </div>
-              </>
-            ) : (
-              <div style={{fontSize:'13px', color:'#6b7280', marginBottom:'8px'}}>
-                Bu kayıt için SMS doğrulama zorunludur. Geçerli telefon numarası ile tekrar kayıt başlatın.
-              </div>
-            )}
+            <div style={{textAlign:'center', marginTop:'14px', color:'#6b7280', fontSize:'13px'}}>veya Google ile doğrula:</div>
+            <div className="socials" style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleRegisterVerifySuccess}
+                onError={() => {
+                  console.error('Google Doğrulama Başarısız')
+                  alert('Google doğrulama başarısız. Lütfen tekrar deneyin.')
+                }}
+                theme="filled_blue"
+                text="continue_with"
+                shape="rectangular"
+                size="medium"
+                locale="tr"
+              />
+            </div>
 
             <button
               type="button"

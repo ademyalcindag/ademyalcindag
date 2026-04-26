@@ -86,6 +86,14 @@ Bu komut otomatik olarak build yapar ve Hostinger için hazırlar.
    GOOGLE_CLIENT_ID=your-google-client-id
    VITE_GOOGLE_CLIENT_ID=your-google-client-id
    CORS_ORIGINS=https://www.tasimacilikrehberi.com,https://tasimacilikrehberi.com
+   VITE_API_URL=https://www.tasimacilikrehberi.com
+   SMS_PROVIDER=twilio
+   TWILIO_ACCOUNT_SID=your-twilio-sid
+   TWILIO_AUTH_TOKEN=your-twilio-auth-token
+   TWILIO_FROM_NUMBER=your-twilio-from-number
+   EMAIL_PROVIDER=resend
+   EMAIL_FROM=no-reply@tasimacilikrehberi.com
+   RESEND_API_KEY=your-resend-api-key
    ```
 
 ### Hostinger Yapılandırması
@@ -95,6 +103,7 @@ Bu komut otomatik olarak build yapar ve Hostinger için hazırlar.
 - **Database**: SQLite dosyası otomatik oluşturulur
 - **Static Files**: `dist/` klasöründen serve edilir
 - **Google OAuth**: [Kurulum Kılavuzu](docs/GOOGLE_OAUTH_SETUP.md)
+- **Production Kontrol Listesi**: [Hostinger Checklist](docs/HOSTINGER_PRODUCTION_CHECKLIST.md)
 
 ### Site URL
 

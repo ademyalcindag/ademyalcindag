@@ -39,6 +39,7 @@ En az şu değerleri güncelle:
 
 - `JWT_SECRET` - 32+ karakterli rastgele metin
 - `GOOGLE_CLIENT_ID` - Google Cloud Console'dan
+- `VITE_GOOGLE_CLIENT_ID` - frontend Google client ID
 - `CORS_ORIGINS` - production domain'in (virgülle ayır):
   ```
   CORS_ORIGINS=https://www.senin-domainini.com,https://senin-domainini.com
@@ -48,6 +49,15 @@ En az şu değerleri güncelle:
   ```
   VITE_API_URL=https://www.senin-domainini.com
   ```
+- `SMS_PROVIDER=twilio`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM_NUMBER`
+- `EMAIL_PROVIDER=resend`
+- `EMAIL_FROM`
+- `RESEND_API_KEY`
+
+Canlı ortam için detaylı kontrol listesi: [docs/HOSTINGER_PRODUCTION_CHECKLIST.md](docs/HOSTINGER_PRODUCTION_CHECKLIST.md)
 
 ## 3) Uygulamayı build et
 
@@ -85,6 +95,8 @@ Aşağıdakileri canlı ortamda kontrol et:
 
 1. ✅ **Google ile görüş** - "Google ile Kayıt Ol" / "Google ile Giriş Yap" çalışıyor
 2. ✅ Kullanıcı kayıt (email + şifre)
+3. ✅ E-posta aktivasyon maili geliyor
+4. ✅ SMS doğrulama kodu geliyor
 3. ✅ Kullanıcı giriş
 4. ✅ Firma kayıt
 5. ✅ Firma giriş

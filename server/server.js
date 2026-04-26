@@ -106,17 +106,13 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || ''
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || ''
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || ''
 const SMS_DEFAULT_COUNTRY_CODE = process.env.SMS_DEFAULT_COUNTRY_CODE || '+90'
-const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || (IS_PRODUCTION ? 'resend' : 'mock')).trim().toLowerCase()
+const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || (IS_PRODUCTION ? 'disabled' : 'mock')).trim().toLowerCase()
 const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
 const EMAIL_FROM = process.env.EMAIL_FROM || 'no-reply@tasimacilikrehberi.com'
 
 let db
 
 function validateRuntimeConfig() {
-  if (IS_PRODUCTION && EMAIL_PROVIDER === 'mock') {
-    throw new Error('Production ortaminda EMAIL_PROVIDER=mock kullanilamaz. Gercek bir e-posta saglayicisi tanimlayin.')
-  }
-
   if (SMS_PROVIDER === 'twilio' && (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER)) {
     throw new Error('Twilio SMS icin TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN ve TWILIO_FROM_NUMBER zorunludur')
   }
@@ -456,6 +452,10 @@ async function sendVerificationSms(phone, code) {
 }
 
 async function sendActivationEmail(email, code, userName) {
+  if (EMAIL_PROVIDER === 'disabled') {
+    throw new Error('E-posta aktivasyonu şu anda devre dışı')
+  }
+
   const safeEmail = normalizeEmail(email)
   if (!safeEmail) {
     throw new Error('Gecerli e-posta adresi gerekli')
@@ -588,6 +588,13 @@ app.post('/api/register', (req, res) => {
 // Step 1: Start pending registration
 app.post('/api/register/start-user', async (req, res) => {
   try {
+    if (EMAIL_PROVIDER === 'disabled') {
+      return res.status(503).json({
+        success: false,
+        error: 'Kayıt geçici olarak kapalı. Lütfen daha sonra tekrar deneyin.',
+      })
+    }
+
     const { name, email, phone, password, confirmPassword } = req.body
     const normalizedEmail = normalizeEmail(email)
     const normalizedPhone = String(phone || '').trim() || null
